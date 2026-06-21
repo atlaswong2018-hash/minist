@@ -45,23 +45,6 @@ const navItems: NavItem[] = [
 function select(key: NavItem['key']): void {
   emit('select-panel', key);
 }
-
-/** full 模式:渲染当前面板的完整内容。 */
-function renderFull(): unknown {
-  switch (props.activePanel) {
-    case 'characters':
-      return 'characters';
-    case 'worldinfo':
-      return 'worldinfo';
-    case 'settings':
-      return 'settings';
-    case 'sync':
-      return 'sync';
-    default:
-      return null;
-  }
-}
-const fullKey = computed(() => renderFull());
 </script>
 
 <template>
@@ -85,20 +68,20 @@ const fullKey = computed(() => renderFull());
 
     <!-- full 模式:渲染面板内容 -->
     <div v-if="mode === 'full'" class="tavern-side__panel">
-      <div v-if="fullKey === 'characters'" class="tavern-side__section">
+      <div v-if="activePanel === 'characters'" class="tavern-side__section">
         <h3 class="tavern-side__h">角色管理</h3>
         <CharacterImport />
         <CharacterList />
       </div>
-      <div v-else-if="fullKey === 'worldinfo'" class="tavern-side__section">
+      <div v-else-if="activePanel === 'worldinfo'" class="tavern-side__section">
         <h3 class="tavern-side__h">世界书</h3>
         <WorldInfoManager />
       </div>
-      <div v-else-if="fullKey === 'settings'" class="tavern-side__section">
+      <div v-else-if="activePanel === 'settings'" class="tavern-side__section">
         <h3 class="tavern-side__h">设置</h3>
         <SettingsPanel />
       </div>
-      <div v-else-if="fullKey === 'sync'" class="tavern-side__section">
+      <div v-else-if="activePanel === 'sync'" class="tavern-side__section">
         <h3 class="tavern-side__h">云同步</h3>
         <SyncPanel />
       </div>

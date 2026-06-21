@@ -8,11 +8,10 @@
  * SCF 单次执行默认超时较短(15s~900s 可调),流式依赖 SCF 的 HTTP 响应流式输出能力
  * (express pipe),由 scf-tencent 包负责;前端侧处理与 Cloudflare 一致。
  */
-import { ROUTES, type ApiEnvelope, type ChatMessage } from '@minist/shared';
+import { ROUTES, type ApiEnvelope } from '@minist/shared';
 import type { CharacterCard } from '@minist/core';
-import type { BackendAdapter, AdapterArgs, ChatOptions, ChatStreamHandle } from './types';
+import type { BackendAdapter, AdapterArgs } from './types';
 import { CloudflareAdapter } from './cloudflare';
-import { fetchStream } from './stream';
 
 interface PresignResult {
   uploadUrl: string;
@@ -34,25 +33,6 @@ export class TencentAdapter extends CloudflareAdapter implements BackendAdapter 
     } catch {
       return false;
     }
-  }
-
-  override async chat(messages: ChatMessage[], opts: ChatOptions = {}): Promise<ChatStreamHandle> {
-    const url = this.base + ROUTES.completions;
-    const stream = opts.stream !== false;
-    const payload = {
-      model: this.cfg.model,
-      messages,
-      stream,
-      temperature: opts.temperature ?? this.cfg.temperature ?? 0.8,
-      max_tokens: opts.maxTokens ?? this.cfg.maxTokens ?? 1024,
-    };
-    const { body, extra } = this.wrapBody(payload);
-    return fetchStream({
-      url,
-      headers: { ...this.headers(this.cfg.crypto), ...extra },
-      body,
-      stream,
-    });
   }
 
   /**

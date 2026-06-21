@@ -22,6 +22,10 @@ export default defineConfig({
   server: {
     host: '0.0.0.0', // 局域网手机访问
     port: 5173,
+    // 允许任意 Host:dev server 常经 cloudflare 隧道 / 局域网 IP / 手机访问,
+    // Host 头不固定;放开校验,避免 vite 5.4.12+ 的 "Blocked request" 拦截。
+    // (server 块仅 dev 生效,build 不用,无生产影响。)
+    allowedHosts: true,
   },
   build: {
     target: 'es2020',

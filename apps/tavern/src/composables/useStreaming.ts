@@ -6,17 +6,17 @@
  *
  * 微信专项:
  *  - AbortController 中断:用户点"停止"立即 abort fetch。
- *  - visibilitychange:微信切后台会挂起 JS 与网络,stream 会在恢复时抛错 → 触发 interrupted,
- *    UI 显示"连接已中断,点此重取"按钮。
+ *  - visibilitychange:微信切后台会冻结网络,fetch 可能无限挂起;恢复可见时若仍在生成,
+ *    模块级监听主动 abort,避免 generating 永远为 true(已生成内容保留,可重取)。
  */
-import { ref, onUnmounted } from 'vue';
+import { ref } from 'vue';
 import type { ChatMessage } from '@minist/shared';
 import { getAdapter, type ChatStreamHandle } from '../adapters';
 import { useConfigStore } from '../store/config';
 import { useChatStore } from '../store/chat';
 import { useCharactersStore } from '../store/characters';
 import { useWorldInfoStore } from '../store/worldinfo';
-import { buildMessages } from '@minist/core';
+import { buildMessages, estimateTokens, trimHistory } from '@minist/core';
 
 // ── 模块级共享状态(所有 useStreaming() 调用共用)─────────────────────
 const generating = ref(false);
@@ -24,19 +24,33 @@ const error = ref('');
 const interrupted = ref(false);
 let handle: ChatStreamHandle | null = null;
 
+// 微信 iOS 后台冻结网络时,流式 fetch 可能无限挂起。模块级单监听:后台时记录时间戳,
+// 恢复可见时若已后台较久(≥5s,典型为微信冻结;桌面快速切 tab 不受影响)且仍在生成则主动 abort,
+// 避免 generating 永远为 true。已生成内容保留,用户可重取。
+let hiddenAt = 0;
+function onVisibility(): void {
+  if (document.hidden) {
+    if (generating.value) hiddenAt = Date.now();
+  } else if (hiddenAt && Date.now() - hiddenAt >= 5000) {
+    hiddenAt = 0;
+    handle?.abort();
+  } else {
+    hiddenAt = 0;
+  }
+}
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', onVisibility);
+  // dev HMR:卸载旧模块时移除监听,避免叠加注册(生产构建无 import.meta.hot)
+  if (import.meta.hot) {
+    import.meta.hot.dispose(() => document.removeEventListener('visibilitychange', onVisibility));
+  }
+}
+
 export function useStreaming() {
   const configStore = useConfigStore();
   const chatStore = useChatStore();
   const charactersStore = useCharactersStore();
   const worldInfoStore = useWorldInfoStore();
-
-  /** visibilitychange:微信后台挂起检测。 */
-  function onVisibility(): void {
-    // 微信 iOS 后台会冻结网络;恢复后 stream 会因 fetch 失败抛错 → 走 interrupted 分支
-    // 这里无需主动处理,异常路径会捕获
-  }
-  document.addEventListener('visibilitychange', onVisibility);
-  onUnmounted(() => document.removeEventListener('visibilitychange', onVisibility));
 
   /** 构造发给 LLM 的 messages(人物卡 + 历史 + 世界书)。 */
   function buildRequestMessages(history: ChatMessage[]): ChatMessage[] {
@@ -44,11 +58,17 @@ export function useStreaming() {
     if (!card) {
       throw new Error('未选中人物卡,请先导入或选择一个角色');
     }
-    return buildMessages({
-      card,
-      history,
-      worldInfo: worldInfoStore.book,
-    });
+    const built = buildMessages({ card, history, worldInfo: worldInfoStore.book });
+    // 历史裁剪:总 token 超(上下文窗口 − 生成预算)才裁剪,正常对话走快路径零成本;
+    // system 段(人物卡 + 世界书)实际大小动态计入预算,不再用拍脑袋的 reserve 常数。
+    const rawCw = configStore.config.contextWindow;
+    const ctxWindow = typeof rawCw === 'number' && Number.isFinite(rawCw) && rawCw > 0 ? rawCw : 32768;
+    const limit = Math.max(0, ctxWindow - (configStore.config.maxTokens ?? 1024));
+    if (built.reduce((s, m) => s + estimateTokens(m.content), 0) <= limit) return built;
+    const systemTokens = built
+      .filter((m) => m.role === 'system')
+      .reduce((s, m) => s + estimateTokens(m.content), 0);
+    return trimHistory(built, Math.max(0, limit - systemTokens));
   }
 
   /** 把原始错误转成对用户友好的提示(重点:CORS/网络失败时给可操作建议)。 */

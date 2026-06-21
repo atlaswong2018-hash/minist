@@ -97,9 +97,10 @@ export function buildMessages(opts: BuildMessagesOptions): ChatMessage[] {
     messages.push({ role: 'system', content: systemContent });
   }
 
-  // ── 历史消息(过滤掉传入的 system,避免重复) ────────────────────────
+  // ── 历史消息(过滤 system 防重复;过滤空 content 防部分 API 400) ─────
   for (const m of history) {
     if (m.role === 'system') continue;
+    if (!m.content) continue;
     messages.push({ role: m.role, content: m.content, name: m.name, timestamp: m.timestamp });
   }
 

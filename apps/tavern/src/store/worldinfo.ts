@@ -7,7 +7,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import type { WorldInfoBook, WorldInfoEntry } from '@minist/core';
-import { STORES, del, getAll, put } from '../db/idb';
+import { STORES, clearStore, del, getAll, put } from '../db/idb';
 
 export const useWorldInfoStore = defineStore('worldinfo', () => {
   const entries = ref<WorldInfoEntry[]>([]);
@@ -66,10 +66,9 @@ export const useWorldInfoStore = defineStore('worldinfo', () => {
   }
 
   async function clear(): Promise<void> {
-    const snapshot = [...entries.value];
+    // 单事务清空,与 replaceAll 风格一致(原逐条 del 既慢又不在同一事务)
+    await clearStore(STORES.worldinfo);
     entries.value = [];
-    // 逐条删
-    for (const e of snapshot) await del(STORES.worldinfo, e.uid);
   }
 
   return {

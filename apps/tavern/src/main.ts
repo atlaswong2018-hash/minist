@@ -31,12 +31,9 @@ async function bootstrap(): Promise<void> {
     const characters = useCharactersStore();
     const worldinfo = useWorldInfoStore();
     const chat = useChatStore();
-    await Promise.all([
-      config.load(),
-      characters.load(),
-      worldinfo.load(),
-      chat.load(),
-    ]);
+    // chat.load 依赖 characters.currentId,需保证 characters 先就绪
+    await Promise.all([config.load(), characters.load()]);
+    await Promise.all([worldinfo.load(), chat.load()]);
   } catch (e) {
     // 初始化失败不阻断 UI,仅 console
     console.error('[minist] 本地数据初始化失败:', e);

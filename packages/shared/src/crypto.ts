@@ -14,15 +14,13 @@
 /** UTF-8 安全的 Base64 编码。 */
 export function encodeBase64(str: string): string {
   const bytes = new TextEncoder().encode(str);
-  let binary = '';
-  const chunk = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunk) {
-    binary += String.fromCharCode.apply(
-      null,
-      bytes.subarray(i, i + chunk) as unknown as number[],
-    );
+  // 逐字节填入数组再 join:避免 String.fromCharCode.apply 在大 subarray 上
+  // 触发参数列表上限(部分老 iOS WKWebView >65535 抛 RangeError),且无字符串拼接 O(n²)。
+  const parts: string[] = new Array(bytes.length);
+  for (let i = 0; i < bytes.length; i++) {
+    parts[i] = String.fromCharCode(bytes[i]);
   }
-  return btoa(binary);
+  return btoa(parts.join(''));
 }
 
 /** UTF-8 安全的 Base64 解码。 */
@@ -31,34 +29,4 @@ export function decodeBase64(b64: string): string {
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   return new TextDecoder().decode(bytes);
-}
-
-/** 简单 XOR 混淆(可选增强):用固定 key 流异或,再 Base64。 */
-export function xorEncode(str: string, key: string): string {
-  if (!key) return encodeBase64(str);
-  const bytes = new TextEncoder().encode(str);
-  const keyBytes = new TextEncoder().encode(key);
-  const out = new Uint8Array(bytes.length);
-  for (let i = 0; i < bytes.length; i++) {
-    out[i] = bytes[i] ^ keyBytes[i % keyBytes.length];
-  }
-  let binary = '';
-  const chunk = 0x8000;
-  for (let i = 0; i < out.length; i += chunk) {
-    binary += String.fromCharCode.apply(null, out.subarray(i, i + chunk) as unknown as number[]);
-  }
-  return btoa(binary);
-}
-
-export function xorDecode(b64: string, key: string): string {
-  if (!key) return decodeBase64(b64);
-  const binary = atob(b64.trim());
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  const keyBytes = new TextEncoder().encode(key);
-  const out = new Uint8Array(bytes.length);
-  for (let i = 0; i < bytes.length; i++) {
-    out[i] = bytes[i] ^ keyBytes[i % keyBytes.length];
-  }
-  return new TextDecoder().decode(out);
 }

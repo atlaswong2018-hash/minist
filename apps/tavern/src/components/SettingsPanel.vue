@@ -223,6 +223,20 @@ async function onRestore(e: Event): Promise<void> {
       />
     </div>
 
+    <!-- contextWindow -->
+    <div class="tavern-settings__group">
+      <label class="tavern-settings__label">上下文窗口(历史裁剪预算)</label>
+      <input
+        class="tavern-settings__input"
+        type="number"
+        min="2048"
+        step="1024"
+        :value="cfg.contextWindow"
+        @change="update('contextWindow', Math.max(2048, parseInt(($event.target as HTMLInputElement).value, 10) || 32768))"
+      />
+      <p class="tavern-settings__hint">对话历史 token 超过此值会从最旧开始裁剪,防超长报错。默认 32768。</p>
+    </div>
+
     <!-- userId -->
     <div class="tavern-settings__group">
       <label class="tavern-settings__label">用户 ID(同步分区键)</label>

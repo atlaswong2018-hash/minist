@@ -54,6 +54,11 @@ function getDB(): Promise<IDBPDatabase> {
         db.createObjectStore(STORES.kv);
       }
     },
+  }).catch((e) => {
+    // 打开失败(如 Safari 隐私模式 quota 拒绝):重置单例允许下次重试,
+    // 避免永久持有 rejected promise 导致整个 app 不可自愈。
+    dbPromise = null;
+    throw e;
   });
   return dbPromise;
 }
@@ -135,11 +140,11 @@ export async function loadAll(userId: string): Promise<SyncPayload> {
   };
 }
 
-/** 用 SyncPayload 全量替换本地数据(先清空再写入,事务内完成)。 */
+/** 用 SyncPayload 全量替换本地数据(先清空再写入,含 config 同事务完成)。 */
 export async function replaceAll(payload: SyncPayload): Promise<void> {
   const db = await getDB();
   const tx = db.transaction(
-    [STORES.characters, STORES.chats, STORES.worldinfo, STORES.presets],
+    [STORES.characters, STORES.chats, STORES.worldinfo, STORES.presets, STORES.kv],
     'readwrite',
   );
   await Promise.all([
@@ -153,12 +158,10 @@ export async function replaceAll(payload: SyncPayload): Promise<void> {
     ...payload.chats.map((c) => tx.objectStore(STORES.chats).put(c)),
     ...payload.worldinfo.map((w) => tx.objectStore(STORES.worldinfo).put(w)),
     ...payload.presets.map((p) => tx.objectStore(STORES.presets).put(p)),
+    // config 与其余数据同事务写入,避免半替换不一致(kv store 无 keyPath,显式传 key)
+    ...(payload.config ? [tx.objectStore(STORES.kv).put(payload.config, KV_CONFIG_KEY)] : []),
   ]);
   await tx.done;
-  // config 单独写(走 kv)
-  if (payload.config) {
-    await kvPut(KV_CONFIG_KEY, payload.config);
-  }
 }
 
 /** 清空全部本地数据(慎用,设置面板"清空本地数据"调用)。 */

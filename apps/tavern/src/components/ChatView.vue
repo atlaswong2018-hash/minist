@@ -23,11 +23,12 @@ function scrollToBottom(): void {
     if (scroller.value) scroller.value.scrollTop = scroller.value.scrollHeight;
   });
 }
-// 消息变化即滚到底(流式 token 更新会频繁触发,但 DOM 操作廉价)
+// 末条内容长度变化(流式 token 增量,直接 mutate 触发)→ 滚到底。O(1),不再 join 全历史。
 watch(
-  () => messages.value.map((m) => m.content).join('|'),
+  () => messages.value[messages.value.length - 1]?.content.length ?? 0,
   scrollToBottom,
 );
+// 消息条数变化(新消息 / 重取裁剪)→ 滚到底
 watch(() => messages.value.length, scrollToBottom);
 
 function onRegenerate(): void {
@@ -52,7 +53,7 @@ function goImport(): void {
     <div v-else ref="scroller" class="tavern-chat__scroller">
       <div
         v-for="(m, i) in messages"
-        :key="i"
+        :key="m.id"
         class="tavern-bubble"
         :class="`is-${m.role}`"
       >

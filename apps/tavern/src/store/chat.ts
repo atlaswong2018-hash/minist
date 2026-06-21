@@ -17,6 +17,14 @@ interface ChatRecord {
   updatedAt: number;
 }
 
+/** 稳定消息 id(仅作 v-for key,后端不消费):优先 crypto.randomUUID,跨会话/多标签页无碰撞。 */
+function nextId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 export const useChatStore = defineStore('chat', () => {
   /** 当前角色会话的消息列表(system/assistant 首条开场白 + user/assistant 历史)。 */
   const messages = ref<ChatMessage[]>([]);
@@ -44,7 +52,8 @@ export const useChatStore = defineStore('chat', () => {
     activeCharacterId.value = characterId;
     const rec = allChats.value.get(characterId);
     if (rec) {
-      messages.value = [...rec.messages];
+      // 旧记录可能无 id(此字段为新增),补齐以保证列表 key 稳定
+      messages.value = rec.messages.map((m) => (m.id ? m : { ...m, id: nextId() }));
       return;
     }
     // 新会话:尝试注入人物卡开场白
@@ -52,7 +61,7 @@ export const useChatStore = defineStore('chat', () => {
     const local = characters.list.find((c) => c.id === characterId);
     const firstMes = local?.card.data?.first_mes?.trim();
     messages.value = firstMes
-      ? [{ role: 'assistant', content: firstMes, timestamp: Date.now() }]
+      ? [{ id: nextId(), role: 'assistant', content: firstMes, timestamp: Date.now() }]
       : [];
     await persist();
   }
@@ -74,7 +83,7 @@ export const useChatStore = defineStore('chat', () => {
     if (!text.trim()) return;
     messages.value = [
       ...messages.value,
-      { role: 'user', content: text, timestamp: Date.now() },
+      { id: nextId(), role: 'user', content: text, timestamp: Date.now() },
     ];
     await persist();
   }
@@ -83,17 +92,16 @@ export const useChatStore = defineStore('chat', () => {
   function beginAssistant(): number {
     messages.value = [
       ...messages.value,
-      { role: 'assistant', content: '', timestamp: Date.now() },
+      { id: nextId(), role: 'assistant', content: '', timestamp: Date.now() },
     ];
     return messages.value.length - 1;
   }
 
-  /** 流式更新最后一条 assistant 消息内容(增量拼接)。 */
+  /** 流式更新最后一条 assistant 消息内容(直接 mutate,避免每 token 整数组拷贝)。 */
   function appendAssistantToken(index: number, token: string): void {
-    const arr = [...messages.value];
-    if (arr[index] && arr[index].role === 'assistant') {
-      arr[index] = { ...arr[index], content: arr[index].content + token };
-      messages.value = arr;
+    const msg = messages.value[index];
+    if (msg && msg.role === 'assistant') {
+      msg.content += token;
     }
   }
 

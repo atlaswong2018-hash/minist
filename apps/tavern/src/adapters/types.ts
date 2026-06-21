@@ -50,9 +50,6 @@ export interface BackendAdapter {
   /** 保存人物卡到云端(后端为 local/direct 时为 no-op)。 */
   saveCard(card: CharacterCard): Promise<void>;
 
-  /** 拉取云端人物卡列表(后端为 local/direct 时返回空)。 */
-  loadCards(): Promise<unknown[]>;
-
   /** 上传全量同步负载到云端。 */
   sync(payload: SyncPayload): Promise<void>;
 

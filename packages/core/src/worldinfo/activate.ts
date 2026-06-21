@@ -15,50 +15,25 @@
 
 import type { WorldInfoBook, WorldInfoEntry } from './types.js';
 
-/** 激活选项(预留扩展点)。 */
-export interface ActivateOptions {
-  /**
-   * 忽略 `enabled` 字段强制激活所有非禁用条目(调试用)。
-   * 默认 false。
-   */
-  ignoreEnabled?: boolean;
-  /**
-   * 额外追加的常驻条目 uid 列表(用户手动 pin 的条目)。
-   */
-  forceActiveUids?: Array<WorldInfoEntry['uid']>;
-  /**
-   * 最多返回多少条(模拟 token 预算的简化版)。默认不限。
-   */
-  limit?: number;
-}
-
 /**
  * 根据最近对话上下文,计算应激活的世界书条目。
  *
  * @param book 世界书
  * @param recentContext 最近 N 条对话拼接的文本(用于关键词扫描)
- * @param options 激活选项
  * @returns 激活条目数组(按 order 升序,constant 条目排在最前)
  */
-export function activateEntries(
-  book: WorldInfoBook,
-  recentContext: string,
-  options: ActivateOptions = {},
-): WorldInfoEntry[] {
-  const { ignoreEnabled = false, forceActiveUids = [], limit } = options;
+export function activateEntries(book: WorldInfoBook, recentContext: string): WorldInfoEntry[] {
   const entries = book.entries || [];
-  const forceSet = new Set(forceActiveUids);
-  // 统一在(可选)大小写不敏感模式下扫描:对 context 预计算
-  // 由于每条目 case_sensitive 不同,这里按条目决定是否 toLowerCase
+  // 预计算小写上下文:每条目按自身 case_sensitive 决定是否 toLowerCase 扫描
   const ctxLower = recentContext.toLowerCase();
 
   const active: WorldInfoEntry[] = [];
 
   for (const entry of entries) {
-    if (!ignoreEnabled && entry.enabled === false) continue;
+    if (entry.enabled === false) continue;
 
-    // 常驻 或 被 pin:直接激活
-    if (entry.constant || forceSet.has(entry.uid)) {
+    // 常驻条目恒激活(无视关键词)
+    if (entry.constant) {
       active.push(entry);
       continue;
     }
@@ -78,7 +53,7 @@ export function activateEntries(
     return String(a.uid).localeCompare(String(b.uid));
   });
 
-  return typeof limit === 'number' && limit >= 0 ? active.slice(0, limit) : active;
+  return active;
 }
 
 /**

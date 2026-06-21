@@ -15,6 +15,8 @@ export type ChatRole = 'system' | 'user' | 'assistant';
 export interface ChatMessage {
   role: ChatRole;
   content: string;
+  /** 前端列表稳定 key / 去重用(生成于前端,后端透传忽略)。 */
+  id?: string;
   /** 角色名(多角色组队时用)。 */
   name?: string;
   /** 前端展示用的时间戳(ms)。 */
@@ -37,6 +39,8 @@ export interface TavernConfig {
   userId: string;
   temperature?: number;
   maxTokens?: number;
+  /** 模型上下文窗口(token),用于历史裁剪预算,避免长对话超限报错。默认见 config store。 */
+  contextWindow?: number;
   /** 流式输出开关。 */
   stream?: boolean;
 }

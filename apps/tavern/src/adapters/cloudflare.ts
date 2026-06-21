@@ -21,6 +21,7 @@ import {
 import type { CharacterCard } from '@minist/core';
 import type { BackendAdapter, AdapterArgs, ChatOptions, ChatStreamHandle } from './types';
 import { fetchStream } from './stream';
+import { buildChatPayload } from './payload';
 
 function joinUrl(base: string, path: string): string {
   return base.replace(/\/$/, '') + path;
@@ -80,14 +81,7 @@ export class CloudflareAdapter implements BackendAdapter {
   async chat(messages: ChatMessage[], opts: ChatOptions = {}): Promise<ChatStreamHandle> {
     const url = joinUrl(this.base, ROUTES.completions);
     const stream = opts.stream !== false;
-    const payload = {
-      model: this.cfg.model,
-      messages,
-      stream,
-      temperature: opts.temperature ?? this.cfg.temperature ?? 0.8,
-      max_tokens: opts.maxTokens ?? this.cfg.maxTokens ?? 1024,
-    };
-    const { body, extra } = this.wrapBody(payload);
+    const { body, extra } = this.wrapBody(buildChatPayload(this.cfg, messages, opts));
     return fetchStream({
       url,
       headers: { ...this.headers(this.cfg.crypto), ...extra },
@@ -108,12 +102,6 @@ export class CloudflareAdapter implements BackendAdapter {
       body,
     });
     if (!resp.ok) throw new Error(`保存人物卡失败 ${resp.status}`);
-  }
-
-  async loadCards(): Promise<unknown[]> {
-    // Worker 的 /api/storage/:key 是单 key 读写,无列表接口。
-    // 云端角色卡的批量管理请走「同步」(POST/GET /api/sync,loadAll/replaceAll)。
-    return [];
   }
 
   async sync(payload: SyncPayload): Promise<void> {

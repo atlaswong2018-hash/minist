@@ -20,6 +20,8 @@ const DEFAULT_CONFIG: TavernConfig = {
   userId: '',
   temperature: 0.8,
   maxTokens: 1024,
+  /** 历史裁剪预算的上下文窗口兜底;正常对话不会触发,仅防超长报错。 */
+  contextWindow: 32768,
   stream: true,
 };
 
@@ -32,14 +34,10 @@ export const useConfigStore = defineStore('config', () => {
     config.value.backend === 'local' ? 'direct' : config.value.backend,
   );
 
-  /** 是否已配置可发聊天:direct/cloudflare/tencent 都需要 apiBaseUrl + apiKey。 */
-  const canChat = computed(() => {
-    if (!config.value.apiKey) return false;
-    if (effectiveBackend.value === 'direct' || effectiveBackend.value === 'cloudflare' || effectiveBackend.value === 'tencent') {
-      return Boolean(config.value.apiBaseUrl);
-    }
-    return false;
-  });
+  /** 是否已配置可发聊天:effectiveBackend 已把 local 映射为 direct,故三模式都需 apiBaseUrl + apiKey。 */
+  const canChat = computed(
+    () => Boolean(config.value.apiKey) && Boolean(config.value.apiBaseUrl),
+  );
 
   async function load(): Promise<void> {
     const saved = await kvGet<TavernConfig>(KV_CONFIG_KEY);
