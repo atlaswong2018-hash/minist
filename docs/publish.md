@@ -71,17 +71,24 @@ git push origin --tags
 - **Issues / Discussions**:Settings → Features 按需开启(Issue 模板已就绪)。
 - **Security**:Settings → Code security → 开启 Dependabot(`.github/dependabot.yml` 已配)、Secret scanning(若可用)。
 
-## 4.(可选)把案例部署平台发布到 GitHub Pages
+## 4. 把案例部署平台发布到 GitHub Pages
 
-`apps/platform`(案例部署平台)是纯静态站,可托管到 GitHub Pages,作为项目"案例网站":
+`apps/platform`(案例部署平台)是纯静态站,仓库已内置部署工作流
+`.github/workflows/pages.yml`:推送到 `main` 且改动涉及 `apps/platform`、`packages/shared`、
+`packages/deploy-agent` 时自动构建并发布到 Pages,得到在线"案例网站":
 
-```bash
-# 临时本地构建验证
-npm run build --workspace @minist/platform
+```
+https://<OWNER>.github.io/minist/
 ```
 
-新增 `.github/workflows/pages.yml`(如需要可由维护者添加)构建 `apps/platform` 并部署到 Pages,
-即可得到 `https://OWNER.github.io/minist/` 形态的在线案例站。酒馆前端 `apps/tavern` 同理。
+**一次性前提**:仓库 Settings → Pages → Build and deployment → Source 选 **"GitHub Actions"**
+(不是 branch)。设好后,下次符合条件的 push 即触发部署。
+
+本地构建验证:
+
+```bash
+npm run build --workspace @minist/platform
+```
 
 ## 5. 替换占位仓库路径(可选)
 
