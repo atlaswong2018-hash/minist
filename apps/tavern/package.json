@@ -15,7 +15,7 @@
     "@minist/core": "*",
     "@minist/shared": "*",
     "idb": "^8.0.0",
-    "pinia": "^2.2.6",
+    "pinia": "^3.0.4",
     "vue": "^3.5.13"
   },
   "devDependencies": {
