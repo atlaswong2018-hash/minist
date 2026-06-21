@@ -53,5 +53,5 @@
 - CF `/api/cf-setup`、CAM STS 中转需对应平台真实 API Token 验证。
 - 前端为精简实现,非 SillyTavern 功能满血;token 计数为启发式。
 
-[Unreleased]: https://github.com/minist-tavern/minist/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/minist-tavern/minist/releases/tag/v0.1.0
+[Unreleased]: https://github.com/atlaswong2018-hash/minist/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/atlaswong2018-hash/minist/releases/tag/v0.1.0

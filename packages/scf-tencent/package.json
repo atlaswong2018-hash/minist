@@ -5,10 +5,10 @@
   "description": "minist 腾讯云 SCF Web 函数后端——极薄 Serverless,独立打包上传,免备案部署。",
   "license": "AGPL-3.0-only",
   "author": "minist contributors",
-  "homepage": "https://github.com/minist-tavern/minist",
+  "homepage": "https://github.com/atlaswong2018-hash/minist",
   "repository": {
     "type": "git",
-    "url": "https://github.com/minist-tavern/minist.git"
+    "url": "https://github.com/atlaswong2018-hash/minist.git"
   },
   "main": "src/index.js",
   "scripts": {

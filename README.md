@@ -99,7 +99,7 @@ minist/
 ## 🚀 快速开始(本地开发)
 
 ```bash
-git clone https://github.com/minist-tavern/minist.git
+git clone https://github.com/atlaswong2018-hash/minist.git
 cd minist
 npm install            # 链接所有 workspace 包
 

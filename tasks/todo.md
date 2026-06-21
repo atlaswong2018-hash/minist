@@ -49,8 +49,8 @@
 
 ### 待用户操作(部署到 GitHub)
 - 本环境无 `gh` CLI 与 GitHub 凭证,git 仓库仅完成本地初始化与提交。
-- 推送到 GitHub:在 GitHub 新建空仓库 `minist-tavern/minist`,然后:
-  `git remote add origin git@github.com:minist-tavern/minist.git && git push -u origin main --tags`
+- 推送到 GitHub:在 GitHub 新建空仓库 `atlaswong2018-hash/minist`,然后:
+  `git remote add origin git@github.com:atlaswong2018-hash/minist.git && git push -u origin main --tags`
 - git 作者目前为占位(`minist <minist@users.noreply.github.com>`),可在推送前 `git config user.name/user.email` 重新设置并 `git commit --amend --reset-author`(尚未推送,可安全改写)。
 - 案例部署平台(`apps/platform`)构建产物可托管到 CF Pages / Vercel / GitHub Pages;酒馆前端同理。
 

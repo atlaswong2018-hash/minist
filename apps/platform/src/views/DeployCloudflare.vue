@@ -189,7 +189,7 @@ wrangler r2 bucket create <span class="hl">{{ form.r2Bucket }}</span>
           <p class="text-sm text-dim mb-2">
             仓库 README 里的 "Deploy to Cloudflare" 按钮一键部署(会引导授权 + 填资源 id)。
           </p>
-          <pre><code>https://deploy.workers.cloudflare.com/?url=https://github.com/minist-tavern/minist</code></pre>
+          <pre><code>https://deploy.workers.cloudflare.com/?url=https://github.com/atlaswong2018-hash/minist</code></pre>
 
           <h4 class="mt-3">方式 B:wrangler deploy</h4>
           <pre><code># 在 packages/worker-cloudflare 目录

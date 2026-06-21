@@ -5,10 +5,10 @@
   "description": "MiniTavern (minist) — 免备案 Serverless 酒馆(SillyTavern)裁剪移植 + 一键部署平台。纯前端 SPA + 极薄 Cloudflare/腾讯云 SCF 后端,适配手机与微信内置浏览器。",
   "license": "AGPL-3.0-only",
   "author": "minist contributors",
-  "homepage": "https://github.com/minist-tavern/minist",
+  "homepage": "https://github.com/atlaswong2018-hash/minist",
   "repository": {
     "type": "git",
-    "url": "https://github.com/minist-tavern/minist.git"
+    "url": "https://github.com/atlaswong2018-hash/minist.git"
   },
   "keywords": [
     "sillytavern",
