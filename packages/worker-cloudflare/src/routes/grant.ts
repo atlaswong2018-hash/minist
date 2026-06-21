@@ -29,23 +29,8 @@ import { ok, err } from '@minist/shared';
 import type { Env } from '../env';
 import { jsonCors } from '../cors';
 import { signTc3 } from '../tc3';
+import { tencentEndpoint } from '../tencent';
 import { HEADERS } from '@minist/shared';
-
-/**
- * 解析腾讯云 API 端点(支持 TENCENT_API_BASE 覆写以指向本地 mock)。
- * 返回完整请求 url 与用于 TC3 签名的 host(二者必须一致,否则验签失败)。
- */
-function tencentEndpoint(
-  apiBase: string | null | undefined,
-  service: string,
-): { url: string; host: string } {
-  if (apiBase) {
-    const base = apiBase.replace(/\/+$/, '');
-    return { url: base, host: base.replace(/^https?:\/\//, '') };
-  }
-  const host = `${service}.tencentcloudapi.com`;
-  return { url: `https://${host}`, host };
-}
 
 /** grant 请求体。 */
 interface GrantRequest {

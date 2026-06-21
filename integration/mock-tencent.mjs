@@ -22,6 +22,8 @@ const DEFAULT_MAIN_KEY = 'mockMAINkey000000000000000000000000000';
 
 const ACTION_TO_SERVICE = {
   GetFederationToken: 'sts',
+  AssumeRole: 'sts',
+  ListFunctions: 'scf',
   UpdateFunctionConfiguration: 'scf',
   CreateBucket: 'cos',
   GetFunction: 'scf',
@@ -59,7 +61,7 @@ export function startMockTencent(
     // 选择验签密钥:STS 用主密钥;SCF/COS 用对应临时密钥(按 credential 里的 SecretId 查)。
     const credSecretId = parsedAuth?.secretId ?? null;
     let verifyKey = mainSecretKey;
-    if (action !== 'GetFederationToken') {
+    if (action !== 'GetFederationToken' && action !== 'AssumeRole') {
       const cred = issuedCreds.get(credSecretId);
       if (cred) verifyKey = cred.TmpSecretKey;
     }
@@ -100,7 +102,7 @@ export function startMockTencent(
       );
     }
 
-    if (action === 'GetFederationToken') {
+    if (action === 'GetFederationToken' || action === 'AssumeRole') {
       const rnd = Math.random().toString(36).slice(2, 12);
       const tmpId = 'AKIDmockTMP' + rnd;
       const tmpKey = 'mockTMPkey' + rnd + rnd;
@@ -127,6 +129,27 @@ export function startMockTencent(
             FunctionName: payload.FunctionName,
             Timeout: payload.Timeout,
             MemorySize: payload.MemorySize,
+          },
+        }),
+      );
+    }
+
+    if (action === 'ListFunctions') {
+      // 返回一组 mock 云函数(按 Limit 截断),供批量管理 list / set-config(全量自锁)联调。
+      const payload = tryJson(body) || {};
+      const limit = Number(payload.Limit) || 20;
+      const allFns = [
+        { FunctionId: 'fn-1', FunctionName: 'minist-tavern-a', Runtime: 'Nodejs18.15' },
+        { FunctionId: 'fn-2', FunctionName: 'minist-tavern-b', Runtime: 'Nodejs18.15' },
+        { FunctionId: 'fn-3', FunctionName: 'minist-tavern-c', Runtime: 'Python3.9' },
+      ];
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(
+        JSON.stringify({
+          Response: {
+            TotalCount: allFns.length,
+            Functions: allFns.slice(0, limit),
+            RequestId: 'mock-list-' + Date.now().toString(36),
           },
         }),
       );

@@ -13,6 +13,13 @@
   - Worker 腾讯 API base 不可覆写 → `grant.ts` 新增 `TENCENT_API_BASE` env(也利于 staging)。
   - tavern↔Worker storage 路由不匹配(POST `/api/storage` vs 要求 `/api/storage/:key` 会 404)→ 已对齐,云端角色卡批量管理走 `sync`。
 
+### 已完成 — 运营方跨账号批量管理(STS AssumeRole,安全合规)
+- Worker 新增 `/api/admin/batch-scf` 路由(`OPERATOR_TOKEN` 鉴权)+ `src/tencent.ts`(`assumeRole` / `scfListFunctions` / `scfUpdateConfig`,统一 TC3-HMAC-SHA256 签名)。
+- 正确姿势:客户在其 CAM 建跨账号角色给运营方扮演,只提供 uin + 角色名(**绝不收集 SecretKey**);运营方主账号密钥 STS `AssumeRole` 换临时凭证,再批量 list / 自锁配置对方云函数。可吊销。
+- 平台新增「批量管理」面板:录入客户账号、选操作(列出函数 / 批量自锁 Timeout=60/MemorySize=128)、逐账号展示结果。
+- 集成测试 `run-batch.mjs`:strict 验签 AssumeRole(主密钥/sts)+ ListFunctions(临时密钥/scf)+ 临时凭证链路 + 全量自锁,全绿。
+- 文档 `docs/batch-manage.md`:客户侧 CAM 授权步骤 + 运营方 API + 安全/子请求预算。
+
 ### 计划中
 - 精确 tokenizer(替换启发式 token 估算)
 - 人物卡可视化编辑器

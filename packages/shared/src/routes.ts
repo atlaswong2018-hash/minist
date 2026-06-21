@@ -19,6 +19,8 @@ export const ROUTES = {
   sync: '/api/sync',
   /** 腾讯云方案二:Token 自改超时配置。 */
   adminTimeout: '/api/admin/set-timeout',
+  /** 运营方批量管理多个外部腾讯云账号的云函数(STS AssumeRole 跨账号)。 */
+  batchScf: '/api/admin/batch-scf',
   /** 腾讯云方案一:CAM 跨账号授权中转(code→STS→自动配置)。 */
   grantConfig: '/api/grant-config',
   /** CF 方案一:CF API 自动配置 Worker/KV/D1/R2 绑定。 */
@@ -37,6 +39,8 @@ export const HEADERS = {
   userId: 'X-User-Id',
   /** CAM 回调授权码(方案一)。 */
   grantCode: 'X-Grant-Code',
+  /** 运营方批量管理鉴权 token(跨账号批量操作)。 */
+  operatorToken: 'X-Operator-Token',
 } as const;
 
 /** CORS:允许任意源(手机/微信浏览器跨域)。 */
@@ -50,6 +54,7 @@ export const CORS_HEADERS: Record<string, string> = {
     HEADERS.adminToken,
     HEADERS.userId,
     HEADERS.grantCode,
+    HEADERS.operatorToken,
   ].join(', '),
   'Access-Control-Max-Age': '86400',
 };

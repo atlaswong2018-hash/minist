@@ -29,6 +29,7 @@ import { handleSync } from './routes/sync';
 import { handleCompletions } from './routes/completions';
 import { handleGrantConfig } from './routes/grant';
 import { handleCfSetup } from './routes/cf-setup';
+import { handleBatchScf } from './routes/batch';
 
 export default {
   async fetch(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
@@ -97,6 +98,11 @@ async function route(request: Request, env: Env): Promise<Response> {
   // ─── CF 方案一(自动建 KV/D1/R2)─────────────────────────────────
   if (path === ROUTES.cfSetup && method === 'POST') {
     return handleCfSetup(request, env);
+  }
+
+  // ─── 运营方批量管理外部腾讯云账号的云函数(AssumeRole 跨账号)──────
+  if (path === ROUTES.batchScf && method === 'POST') {
+    return handleBatchScf(request, env);
   }
 
   // ─── 方案二:Token 自改超时 ────────────────────────────────────────

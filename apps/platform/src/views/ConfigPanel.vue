@@ -64,6 +64,10 @@ async function checkTencent() {
         <input v-model="edit.adminToken" class="input" type="password" />
       </div>
       <div class="field">
+        <label>运营方 Operator Token(批量管理用,中转 Worker 上配 OPERATOR_TOKEN env)</label>
+        <input v-model="edit.operatorToken" class="input" type="password" />
+      </div>
+      <div class="field">
         <label>同步分区 userId(留空则由酒馆生成)</label>
         <input v-model="edit.userId" class="input" placeholder="u_xxxxxxxx" />
       </div>

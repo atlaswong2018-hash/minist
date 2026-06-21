@@ -39,4 +39,6 @@ export interface Env {
   CF_API_TOKEN?: string;
   /** Cloudflare Account ID。 */
   CF_ACCOUNT_ID?: string;
+  /** 运营方批量管理鉴权 token(跨账号 batch-scf 路由)。 */
+  OPERATOR_TOKEN?: string;
 }

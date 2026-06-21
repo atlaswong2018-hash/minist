@@ -8,16 +8,18 @@ import { ref } from 'vue';
 import Home from './views/Home.vue';
 import DeployCloudflare from './views/DeployCloudflare.vue';
 import DeployTencent from './views/DeployTencent.vue';
+import BatchManage from './views/BatchManage.vue';
 import ConfigPanel from './views/ConfigPanel.vue';
 import SyncCenter from './views/SyncCenter.vue';
 import AiAssistant from './views/AiAssistant.vue';
 
-type TabId = 'home' | 'cf' | 'tencent' | 'config' | 'sync' | 'ai';
+type TabId = 'home' | 'cf' | 'tencent' | 'batch' | 'config' | 'sync' | 'ai';
 
 const tabs: { id: TabId; label: string }[] = [
   { id: 'home', label: '首页' },
   { id: 'cf', label: '部署 CF' },
   { id: 'tencent', label: '部署腾讯云' },
+  { id: 'batch', label: '🗂️ 批量管理' },
   { id: 'config', label: '配置' },
   { id: 'sync', label: '同步' },
   { id: 'ai', label: 'AI 助手' },
@@ -57,6 +59,7 @@ function switchTo(id: TabId) {
       <Home v-if="active === 'home'" @navigate="switchTo" />
       <DeployCloudflare v-else-if="active === 'cf'" />
       <DeployTencent v-else-if="active === 'tencent'" />
+      <BatchManage v-else-if="active === 'batch'" />
       <ConfigPanel v-else-if="active === 'config'" />
       <SyncCenter v-else-if="active === 'sync'" />
       <AiAssistant v-else-if="active === 'ai'" />

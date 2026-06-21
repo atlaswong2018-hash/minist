@@ -25,6 +25,8 @@ export interface PlatformConfig {
   relayWorkerUrl: string;
   /** 方案二 ADMIN_TOKEN(用户在 SCF 环境变量里自填)。 */
   adminToken: string;
+  /** 运营方 Operator Token(批量管理用,运营方在中转 Worker 配 OPERATOR_TOKEN env)。 */
+  operatorToken: string;
   /** 同步分区 userId。 */
   userId: string;
 }
@@ -37,6 +39,7 @@ const DEFAULT_CONFIG: PlatformConfig = {
   tencentScfUrl: '',
   relayWorkerUrl: '',
   adminToken: '',
+  operatorToken: '',
   userId: '',
 };
 
@@ -258,4 +261,35 @@ export const platformConfig = reactive<PlatformConfig>(loadConfig());
 /** 持久化当前配置。 */
 export function persistConfig(): void {
   saveConfig({ ...platformConfig });
+}
+
+/**
+ * 运营方跨账号批量管理腾讯云函数。
+ * 调 {relayUrl}/api/admin/batch-scf,带 X-Operator-Token 头。
+ * 后端在中转 Worker 上配 OPERATOR_TOKEN env,通过 STS:AssumeRole 跨账号扮演角色。
+ * 超时给到 120s(批量操作 + 跨账号 AssumeRole 较慢)。
+ */
+export function batchManageScf(
+  relayUrl: string,
+  operatorToken: string,
+  payload: {
+    accounts: { uin: string; roleName: string; owner?: string }[];
+    operation: 'list' | 'set-config';
+    region?: string;
+    functionName?: string;
+    timeout?: number;
+    memorySize?: number;
+    limit?: number;
+  },
+): Promise<unknown> {
+  return platformFetch(
+    relayUrl,
+    ROUTES.batchScf,
+    {
+      method: 'POST',
+      headers: { [HEADERS.operatorToken]: operatorToken },
+      body: JSON.stringify(payload),
+    },
+    120000,
+  );
 }

@@ -8,6 +8,7 @@
     "tc3": "node tc3-verify.mjs",
     "token": "node run-tencent-token.mjs",
     "cam": "node run-tencent-cam.mjs",
+    "batch": "node run-batch.mjs",
     "cf": "node run-cf-core.mjs",
     "all": "node run-all.mjs"
   }

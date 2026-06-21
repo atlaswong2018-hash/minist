@@ -10,17 +10,19 @@
 | **CF 核心路径** | `run-cf-core.mjs` | CF Worker(wrangler dev 本地 miniflare,KV/D1/R2) | mock LLM(SSE) | KV 往返 / sync 往返 / 流式 / 混淆 |
 | **方案二 · Token 自改** | `run-tencent-token.mjs` | 腾讯云 SCF(admin.js) | mock 腾讯云 SCF API(自签 HTTPS,lenient) | 鉴权门 / 参数透传 / 字段名对齐 |
 | **方案一 · CAM** | `run-tencent-cam.mjs` | CF Worker(grant-config + signTc3) | mock 腾讯云 API(STS+SCF,http,**strict 验签**) | **TC3 签名被独立 Node crypto 验证** |
+| **批量管理 · 跨账号** | `run-batch.mjs` | CF Worker(batch-scf + AssumeRole) | mock 腾讯云 API(STS AssumeRole + SCF,http,**strict 验签**) | OPERATOR_TOKEN 门 / AssumeRole 主密钥+临时密钥验签 / 全量自锁 |
 
 ## 运行
 
 ```bash
 cd integration
 node tc3-verify.mjs          # ① 验签器自检
-node run-all.mjs             # ② 跑全部三条方案
+node run-all.mjs             # ② 跑全部四个场景
 # 或单独:
 node run-cf-core.mjs
 node run-tencent-token.mjs
 node run-tencent-cam.mjs
+node run-batch.mjs
 ```
 
 > 需要本机有 `openssl`(mock 自签 HTTPS 用)与 `npx wrangler`(worker 包 devDep 已装)。
