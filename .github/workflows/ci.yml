@@ -5,6 +5,7 @@ on:
     branches: [main, dev]
   pull_request:
     branches: [main, dev]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -32,3 +33,35 @@ jobs:
 
       - name: Verify SCF loads
         run: node -e "require('./packages/scf-tencent/src/index.js'); console.log('scf-ok')"
+
+  integration:
+    name: Integration (3 deploy paths)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # 抑制 wrangler 遥测/交互提示;CI=true 由 GHA 自动注入
+      CLOUDFLARE_TELEMETRY_DISABLED: '1'
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Sanity (openssl + wrangler + workerd)
+        run: |
+          openssl version
+          npx wrangler --version
+          test -f node_modules/workerd/bin/workerd && echo "workerd present"
+
+      - name: TC3 verifier self-test
+        run: node integration/tc3-verify.mjs
+
+      - name: Run all integration scenarios
+        run: node integration/run-all.mjs
