@@ -51,6 +51,25 @@ export function useStreaming() {
     });
   }
 
+  /** 把原始错误转成对用户友好的提示(重点:CORS/网络失败时给可操作建议)。 */
+  function friendlyError(e: unknown): string {
+    const raw = e instanceof Error ? e.message : String(e);
+    const looksLikeNetwork =
+      e instanceof TypeError || /failed to fetch|network|load failed|\bcors\b/i.test(raw);
+    if (looksLikeNetwork) {
+      if (configStore.effectiveBackend === 'direct') {
+        return (
+          `网络请求失败(很可能是浏览器跨域 CORS 被拦):${raw}\n` +
+          `直连模式下部分厂商(如 OpenAI)不允许浏览器直接调用。建议:\n` +
+          `① 换用支持跨域的厂商(DeepSeek / SiliconFlow / 智谱 等);\n` +
+          `② 或在「设置」切换到 Cloudflare / 腾讯云 中转后端。`
+        );
+      }
+      return `网络请求失败:${raw}\n请检查后端地址是否正确、后端是否在线。`;
+    }
+    return raw;
+  }
+
   /**
    * 发送一条用户消息并流式生成回复。
    */
@@ -93,7 +112,7 @@ export function useStreaming() {
         } else {
           // 微信后台被杀 / 网络断
           interrupted.value = true;
-          error.value = e instanceof Error ? e.message : String(e);
+          error.value = friendlyError(e);
           await chatStore.removeLastIfEmptyAssistant();
         }
       } finally {
@@ -104,7 +123,7 @@ export function useStreaming() {
     } catch (e) {
       generating.value = false;
       chatStore.generating = false;
-      error.value = e instanceof Error ? e.message : String(e);
+      error.value = friendlyError(e);
     }
   }
 

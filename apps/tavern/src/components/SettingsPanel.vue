@@ -31,6 +31,21 @@ const backends: Array<{ value: BackendType; label: string; hint: string }> = [
   { value: 'tencent', label: '腾讯云 SCF', hint: '自部署腾讯云 SCF 中转(免备案)' },
 ];
 
+/** LLM 厂商预设(均为 OpenAI 兼容接口)。点击只填 base + model + 切到本地直连,API Key 留给用户填。 */
+const presets: Array<{ name: string; base: string; model: string }> = [
+  { name: 'DeepSeek', base: 'https://api.deepseek.com', model: 'deepseek-chat' },
+  { name: 'OpenAI', base: 'https://api.openai.com', model: 'gpt-4o-mini' },
+  { name: '智谱 GLM', base: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4-flash' },
+  { name: 'Kimi', base: 'https://api.moonshot.cn', model: 'moonshot-v1-8k' },
+  { name: '通义千问', base: 'https://dashscope.aliyuncs.com/compatible-mode', model: 'qwen-turbo' },
+  { name: 'SiliconFlow', base: 'https://api.siliconflow.cn', model: 'Qwen/Qwen2.5-7B-Instruct' },
+];
+
+async function applyPreset(p: { base: string; model: string }): Promise<void> {
+  await config.update({ backend: 'local', apiBaseUrl: p.base, model: p.model });
+  message.value = '已填入预设,请继续填写你的 API Key';
+}
+
 const message = ref('');
 
 async function update<K extends keyof typeof cfg.value>(key: K, value: (typeof cfg.value)[K]): Promise<void> {
@@ -102,6 +117,22 @@ async function onRestore(e: Event): Promise<void> {
         <option v-for="b in backends" :key="b.value" :value="b.value">{{ b.label }}</option>
       </select>
       <p class="tavern-settings__hint">{{ backends.find((b) => b.value === cfg.backend)?.hint }}</p>
+    </div>
+
+    <!-- LLM 厂商一键预设 -->
+    <div class="tavern-settings__group">
+      <label class="tavern-settings__label">LLM 厂商预设(一键填地址 + 模型)</label>
+      <div class="tavern-settings__presets">
+        <button
+          v-for="p in presets"
+          :key="p.name"
+          type="button"
+          class="tavern-settings__preset"
+          :class="{ 'is-active': cfg.apiBaseUrl === p.base }"
+          @click="applyPreset(p)"
+        >{{ p.name }}</button>
+      </div>
+      <p class="tavern-settings__hint">点击即填入该厂商 API 地址与模型,你再填自己的 API Key 即可聊天(均为 OpenAI 兼容接口)。</p>
     </div>
 
     <!-- apiBaseUrl -->
@@ -300,6 +331,30 @@ async function onRestore(e: Event): Promise<void> {
   font-size: 13px;
   color: #a5f3a0;
   margin: 0;
+}
+.tavern-settings__presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tavern-settings__preset {
+  background: #26263a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #d4d4d8;
+  padding: 7px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.tavern-settings__preset:hover {
+  border-color: rgba(139, 92, 246, 0.6);
+  color: #fff;
+}
+.tavern-settings__preset.is-active {
+  background: rgba(139, 92, 246, 0.2);
+  border-color: #8b5cf6;
+  color: #fff;
 }
 .tavern-settings__danger {
   padding: 14px;

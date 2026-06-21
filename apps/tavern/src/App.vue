@@ -11,6 +11,7 @@ import Sidebar from './components/Sidebar.vue';
 import ChatView from './components/ChatView.vue';
 import MessageInput from './components/MessageInput.vue';
 import CharacterCard from './components/CharacterCard.vue';
+import OnboardingOverlay from './components/OnboardingOverlay.vue';
 import { useCharactersStore } from './store/characters';
 import { useChatStore } from './store/chat';
 import { useMobile } from './composables/useMobile';
@@ -44,6 +45,19 @@ function selectPanel(p: Panel): void {
   activePanel.value = p;
   if (isMobile.value) drawerOpen.value = false;
 }
+
+// GitHub Pages 在线 demo 标识 + 引导横幅
+const isDemo = computed(() => location.hostname.endsWith('github.io'));
+const demoBannerDismissed = ref(localStorage.getItem('minist_demo_banner_dismissed') === '1');
+function dismissBanner(): void {
+  localStorage.setItem('minist_demo_banner_dismissed', '1');
+  demoBannerDismissed.value = true;
+}
+/** 引导浮层"去设置"按钮:切到设置面板并(移动端)打开抽屉。 */
+function onSetup(): void {
+  selectPanel('settings');
+  if (isMobile.value) drawerOpen.value = true;
+}
 </script>
 
 <template>
@@ -66,6 +80,13 @@ function selectPanel(p: Panel): void {
 
     <!-- 主区 -->
     <main class="tavern-main">
+      <!-- GitHub Pages 在线 demo 横幅(仅 *.github.io 显示) -->
+      <div v-if="isDemo && !demoBannerDismissed" class="tavern-demobanner">
+        <span class="tavern-demobanner__text">🌐 在线 demo · 数据只存你的浏览器 · 填自己的 LLM Key 即可聊天</span>
+        <a href="./platform/" target="_blank" rel="noopener" class="tavern-demobanner__link">部署到自己云 →</a>
+        <button class="tavern-demobanner__close" aria-label="关闭" @click="dismissBanner">×</button>
+      </div>
+
       <header class="tavern-topbar">
         <button
           v-if="isMobile"
@@ -102,6 +123,9 @@ function selectPanel(p: Panel): void {
         </template>
       </section>
     </main>
+
+    <!-- 首次访问引导浮层 -->
+    <OnboardingOverlay @setup="onSetup" />
   </div>
 </template>
 
@@ -185,5 +209,46 @@ function selectPanel(p: Panel): void {
 .tavern-panel {
   flex: 1;
   overflow-y: auto;
+}
+/* 在线 demo 横幅 */
+.tavern-demobanner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 14px;
+  background: linear-gradient(90deg, rgba(139, 92, 246, 0.18), rgba(59, 130, 246, 0.12));
+  border-bottom: 1px solid rgba(139, 92, 246, 0.25);
+  font-size: 12px;
+  color: #ddd6fe;
+}
+.tavern-demobanner__text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tavern-demobanner__link {
+  color: #c4b5fd;
+  text-decoration: none;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.tavern-demobanner__link:hover {
+  text-decoration: underline;
+}
+.tavern-demobanner__close {
+  background: transparent;
+  border: none;
+  color: #a1a1aa;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+.tavern-demobanner__close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
 }
 </style>
