@@ -199,6 +199,93 @@ async function execute(): Promise<void> {
 function ownerLabel(item: BatchResultItem): string {
   return item.owner || item.uin || '(未知账号)';
 }
+
+// ===== 给客户的授权指引生成器 =====
+
+/** 是否展开「生成给客户的授权指引」区块。 */
+const showGuide = ref(false);
+/** 建议客户使用的角色名(可编辑)。 */
+const guideRoleName = ref('SCFManagerRole');
+
+/** 运营方 UIN 是否已填(为空时指引里留占位符并给出红字提示)。 */
+const operatorUinMissing = computed(() => !platformConfig.operatorUin.trim());
+
+/** 指引里要展示的 UIN:填了用真值,没填用占位。 */
+const guideUin = computed(() =>
+  platformConfig.operatorUin.trim() || '<运营方UIN未填>',
+);
+
+/**
+ * 拼装给客户看的纯文本 CAM 授权指引。
+ * 把 {UIN} 替换为运营方 UIN(或占位),{ROLE} 替换为建议角色名。
+ */
+const guideText = computed(() => {
+  const uin = guideUin.value;
+  const role = guideRoleName.value.trim() || 'SCFManagerRole';
+  return [
+    '【minist 平台 · 腾讯云授权指引】',
+    '',
+    '请在您的腾讯云账号里完成以下操作,授权 minist 平台管理您的云函数(全程不需要提供任何密钥):',
+    '',
+    '1. 登录腾讯云访问管理 CAM:https://console.cloud.tencent.com/cam/role',
+    '2. 点击「角色」→「新建角色」→ 选择「腾讯云账户」方式。',
+    `3. 「载体」选择「其他主账号」,填入运营方主账号 ID:${uin}`,
+    '4. 「策略」搜索并勾选:QcloudSCFFullAccess(云函数全控制)。',
+    '   (若只想授权"列出自锁、不改代码",可自定义仅含 scf:ListFunctions、scf:UpdateFunctionConfiguration 的策略。)',
+    `5. 「角色名」填写:${role}   ← 请务必用这个名字(或与运营方约定一致),记住它。`,
+    `6. 完成创建后,把您的【主账号 ID】和【角色名 ${role}】发给运营方即可。`,
+    '',
+    '随时可在 CAM 删除或收紧该角色,授权立即失效。',
+  ].join('\n');
+});
+
+/** 可直接发给客户的简短版消息(含完整指引)。 */
+const guideShortMessage = computed(
+  () =>
+    `您好,请按此指引授权 minist 管理您的云函数:\n\n${guideText.value}`,
+);
+
+/**
+ * 复制完整授权指引到剪贴板。
+ * 失败时降级提示,避免 navigator.clipboard 在非 https / 旧浏览器下静默失败。
+ */
+async function copyGuideText(): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(guideText.value);
+    alert('已复制,可直接发给客户');
+  } catch {
+    // 降级:用 textarea + execCommand 兜底(http / 老浏览器)
+    fallbackCopy(guideText.value, '已复制,可直接发给客户');
+  }
+}
+
+/** 复制简短版可发送消息。 */
+async function copyGuideShort(): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(guideShortMessage.value);
+    alert('已复制可发送的消息');
+  } catch {
+    fallbackCopy(guideShortMessage.value, '已复制可发送的消息');
+  }
+}
+
+/** execCommand 降级复制(兼容非 HTTPS / 旧浏览器)。 */
+function fallbackCopy(text: string, successMsg: string): void {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  let ok = false;
+  try {
+    ok = document.execCommand('copy');
+  } catch {
+    ok = false;
+  }
+  document.body.removeChild(ta);
+  alert(ok ? successMsg : '复制失败,请手动选中下方文本复制');
+}
 </script>
 
 <template>
@@ -222,6 +309,64 @@ function ownerLabel(item: BatchResultItem): string {
       <div v-if="missingConfig" class="alert alert-warning">
         <strong>前置配置缺失:</strong>请先在「配置」页填写
         『平台中转 Worker URL』与『运营方 Operator Token』,否则无法执行批量操作。
+      </div>
+    </section>
+
+    <!-- 给客户的授权指引生成器 -->
+    <section class="card">
+      <h2 class="card-title">
+        <span class="badge badge-low">客户引导</span> 给客户的 CAM 授权指引
+      </h2>
+      <p class="card-subtitle">
+        一键生成可直接发给客户(腾讯云账号持有者)的授权步骤文案,客户照做后把
+        <strong>主账号 ID + 角色名</strong> 回填到上方账号列表即可。<strong>全程不收任何密钥</strong>。
+      </p>
+
+      <div class="alert alert-info">
+        <strong>🔒 安全:</strong>客户只需提供主账号 ID 与角色名,绝不收集 SecretId / SecretKey。
+      </div>
+
+      <!-- 触发按钮 -->
+      <button class="btn btn-sm" @click="showGuide = !showGuide">
+        {{ showGuide ? '收起指引' : '📋 生成给客户的授权指引' }}
+      </button>
+
+      <!-- 展开后的指引区块 -->
+      <div v-if="showGuide" class="mt-3">
+        <div class="grid-2">
+          <div class="field">
+            <label>建议角色名(客户在 CAM 创建的角色名)</label>
+            <input v-model="guideRoleName" class="input" placeholder="SCFManagerRole" />
+          </div>
+          <div class="field">
+            <label>运营方主账号 ID(UIN)</label>
+            <input class="input" :value="platformConfig.operatorUin" readonly placeholder="未填写" />
+          </div>
+        </div>
+
+        <div v-if="operatorUinMissing" class="alert alert-danger">
+          <strong>请先在「配置」页填写运营方主账号 ID(UIN)</strong>,
+          否则下方指引里的 UIN 将显示为 <code>&lt;运营方UIN未填&gt;</code>,客户无法完成授权。
+        </div>
+
+        <!-- 指引正文 -->
+        <div class="field">
+          <label>授权指引全文(可直接复制)</label>
+          <pre class="mt-2" style="
+            white-space: pre-wrap;
+            word-break: break-word;
+            background: var(--bg-elevated, rgba(255,255,255,0.02));
+            padding: var(--space-3);
+            border-radius: 6px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-size: var(--fs-sm);
+          ">{{ guideText }}</pre>
+        </div>
+
+        <div class="flex gap-3 flex-wrap mt-3">
+          <button class="btn btn-primary" @click="copyGuideText">📋 复制全文</button>
+          <button class="btn" @click="copyGuideShort">💬 复制可发送的消息(简短版)</button>
+        </div>
       </div>
     </section>
 

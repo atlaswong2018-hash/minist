@@ -20,6 +20,11 @@
 - 集成测试 `run-batch.mjs`:strict 验签 AssumeRole(主密钥/sts)+ ListFunctions(临时密钥/scf)+ 临时凭证链路 + 全量自锁,全绿。
 - 文档 `docs/batch-manage.md`:客户侧 CAM 授权步骤 + 运营方 API + 安全/子请求预算。
 
+### 已完成 — COS XML API v5 改造 + 客户授权指引
+- Worker 新增 `src/cos-sign.ts`(COS v5 HMAC-SHA1 签名,Web Crypto)+ `cosPutBucket`;`grant.ts` 的 `createCosBucket` 从 **TC3 占位改为正确的 COS XML PutBucket + cos v5 签名**(env 加 `COS_API_BASE` 联调覆写)。
+- 集成测试 `cos-sign-verify.mjs`(独立 Node crypto COS v5 实现)+ CAM 场景新增 COS PutBucket **strict 验签**断言(两套独立实现交叉验证,全绿)。
+- 平台「批量管理」加「📋 生成给客户的授权指引」(可复制纯文本,插值运营方 UIN + 角色名);配置页加「运营方主账号 ID(UIN)」字段。
+
 ### 计划中
 - 精确 tokenizer(替换启发式 token 估算)
 - 人物卡可视化编辑器

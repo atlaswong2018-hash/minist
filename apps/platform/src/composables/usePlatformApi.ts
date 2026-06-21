@@ -27,6 +27,12 @@ export interface PlatformConfig {
   adminToken: string;
   /** 运营方 Operator Token(批量管理用,运营方在中转 Worker 配 OPERATOR_TOKEN env)。 */
   operatorToken: string;
+  /**
+   * 运营方腾讯云主账号 ID(UIN)。
+   * 客户创建跨账号角色时,需在「载体」里填此 UIN 才能允许运营方扮演角色。
+   * 用于生成给客户看的 CAM 授权指引。
+   */
+  operatorUin: string;
   /** 同步分区 userId。 */
   userId: string;
 }
@@ -40,6 +46,7 @@ const DEFAULT_CONFIG: PlatformConfig = {
   relayWorkerUrl: '',
   adminToken: '',
   operatorToken: '',
+  operatorUin: '',
   userId: '',
 };
 

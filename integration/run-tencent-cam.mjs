@@ -43,6 +43,7 @@ const wrangler = spawnLong(
     '--var', `TENCENT_API_BASE:http://127.0.0.1:${MOCK_PORT}`,
     '--var', `TENCENT_SECRET_ID:${TEST_ID}`,
     '--var', `TENCENT_SECRET_KEY:${TEST_KEY}`,
+    '--var', `COS_API_BASE:http://127.0.0.1:${MOCK_PORT}`,
   ],
   { cwd: WORKER_DIR, env: { ...process.env, CLOUDFLARE_TELEMETRY_DISABLED: '1', CI: '1' } },
 );
@@ -86,6 +87,27 @@ try {
   // 临时密钥链路:SCF 调用必须用 STS 签发的临时 SecretId(非主密钥)
   if (scf.credSecretId === TEST_ID) fail(TAG, 'SCF 调用仍用主密钥,未切换到临时凭证');
   pass(TAG, '临时凭证链路正确(SCF 调用使用 STS 签发的临时 SecretId)');
+  results.push(true);
+
+  // ⑤ COS PutBucket(cos v5 签名 / HMAC-SHA1,替换原 TC3 占位)
+  const cosGrant = await fetchJson(`http://127.0.0.1:${WORKER_PORT}/api/grant-config`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      code: 'cam-test-code',
+      functionName: 'minist-tavern-test',
+      region: 'ap-guangzhou',
+      createBucket: true,
+      bucketName: 'minist-test-bucket',
+      rootUin: '100000000099',
+    }),
+  });
+  if (cosGrant.status !== 200 || !cosGrant.json?.success) fail(TAG, `COS grant 失败: ${cosGrant.text}`);
+  if (!cosGrant.json.data?.cosBucket?.ok) fail(TAG, `COS PutBucket 未成功: ${JSON.stringify(cosGrant.json.data?.cosBucket)}`);
+  const cosCall = mock.getCalls().find((c) => c.action === 'PutBucket');
+  if (!cosCall) fail(TAG, 'mock 未收到 COS PutBucket 调用(Worker 未发起)');
+  if (!cosCall.sigOk) fail(TAG, 'COS v5 strict 验签失败:Worker cos-sign(Web Crypto)与独立 Node crypto 不一致');
+  pass(TAG, 'COS PutBucket(cos v5 / HMAC-SHA1)strict 验签通过 —— 已替换原 TC3 占位');
   results.push(true);
 } finally {
   wrangler.kill('SIGTERM');

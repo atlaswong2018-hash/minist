@@ -68,6 +68,10 @@ async function checkTencent() {
         <input v-model="edit.operatorToken" class="input" type="password" />
       </div>
       <div class="field">
+        <label>运营方主账号 ID(UIN)(客户创建跨账号角色时填此 ID,用于生成授权指引)</label>
+        <input v-model="edit.operatorUin" class="input" placeholder="100000000001" />
+      </div>
+      <div class="field">
         <label>同步分区 userId(留空则由酒馆生成)</label>
         <input v-model="edit.userId" class="input" placeholder="u_xxxxxxxx" />
       </div>

@@ -30,6 +30,7 @@ import type { Env } from '../env';
 import { jsonCors } from '../cors';
 import { signTc3 } from '../tc3';
 import { tencentEndpoint } from '../tencent';
+import { cosPutBucket } from '../cos-sign';
 import { HEADERS } from '@minist/shared';
 
 /** grant 请求体。 */
@@ -129,7 +130,7 @@ export async function handleGrantConfig(request: Request, env: Env): Promise<Res
         region,
         body.bucketName,
         appid,
-        apiBase,
+        env.COS_API_BASE ?? null,
       ).catch((e) => ({ ok: false, error: (e as Error).message }));
       results.cosBucket = cosRes;
     }
@@ -260,53 +261,21 @@ async function updateScfFunctionConfig(
 }
 
 /**
- * ③ 用临时凭证调 COS CreateBucket。
- * TODO(需真实凭证验证):COS 签名用 COS 自有的 cos-hmac-sha1,与 TC3 不同;
- *    此处用 TC3 调 cos 内部 API(CreateBucket 在 cos-internal 可用),
- *    真实部署应改用 COS XML API + cos 签名。
+ * ③ 用临时凭证调 COS PutBucket(创建存储桶)。
+ * ✅ 正确姿势:COS 用 XML API + cos v5 签名(HMAC-SHA1),非 TC3(见 ../cos-sign)。
+ *    bucket 标准格式 <name>-<appid>;cosApiBase 仅联调用(指向本地 mock),生产留空。
  */
 async function createCosBucket(
   creds: TcCredentials,
   region: string,
   bucketName: string,
   appid: string,
-  apiBase: string | null | undefined,
+  cosApiBase: string | null | undefined,
 ): Promise<{ ok: boolean; requestId?: string; error?: string }> {
-  // 注意:COS 推荐用 XML API(PutBucket),签名算法是 cos v5。
-  // 此处走 TC3 调 cos-intl/CreateBucket 作为骨架实现(需真实验证)。
-  // COS bucket 标准格式:<name>-<appid>。
-  const payload = JSON.stringify({
-    Bucket: `${bucketName}-${appid}`,
-    Region: region,
-  });
-
-  const ep = tencentEndpoint(apiBase, 'cos');
-  const sig = await signTc3({
-    secretId: creds.TmpSecretId,
-    secretKey: creds.TmpSecretKey,
-    service: 'cos',
+  const r = await cosPutBucket(creds, {
     region,
-    action: 'CreateBucket',
-    version: '2018-04-16',
-    payload,
-    timestamp: Math.floor(Date.now() / 1000),
-    host: ep.host,
-    extraHeaders: { 'x-tc-token': creds.Token },
+    bucketFullName: `${bucketName}-${appid}`,
+    apiBase: cosApiBase ?? undefined,
   });
-
-  const res = await fetch(ep.url, {
-    method: 'POST',
-    headers: sig.headers,
-    body: payload,
-  });
-  const json = (await res.json()) as {
-    Response?: { RequestId?: string; Error?: { Code?: string; Message?: string } };
-  };
-  if (!res.ok || json.Response?.Error) {
-    return {
-      ok: false,
-      error: `COS CreateBucket failed: ${json.Response?.Error?.Code ?? res.status} ${json.Response?.Error?.Message ?? ''}`,
-    };
-  }
-  return { ok: true, requestId: json.Response?.RequestId };
+  return { ok: r.ok, requestId: r.requestId, error: r.error };
 }

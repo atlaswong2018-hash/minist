@@ -15,6 +15,7 @@
 import http from 'node:http';
 import https from 'node:https';
 import { verifyRequest, parseAuthHeader } from './tc3-verify.mjs';
+import { verifyCosRequest, parseCosAuth } from './cos-sign-verify.mjs';
 import { ensureSelfSigned } from './cert.mjs';
 
 const DEFAULT_MAIN_ID = 'AKIDmockMAINid000000000000000000000';
@@ -47,6 +48,31 @@ export function startMockTencent(
     const chunks = [];
     for await (const c of req) chunks.push(c);
     const body = Buffer.concat(chunks).toString('utf8');
+
+    // ── COS XML API v5 分支(Authorization 以 q-sign-algorithm= 开头)──────────
+    // COS 用独立签名(HMAC-SHA1),与 TC3 不同;PutBucket 等走这里。
+    const rawAuth = req.headers['authorization'] || '';
+    if (rawAuth.startsWith('q-sign-algorithm=')) {
+      const parsed = parseCosAuth(rawAuth);
+      const credSecretId = parsed?.['q-ak'] ?? null;
+      const cred = issuedCreds.get(credSecretId);
+      const verifyKey = cred ? cred.TmpSecretKey : mainSecretKey;
+      let cosOk = lenient;
+      if (!lenient) {
+        const v = verifyCosRequest({ req, secretKey: verifyKey });
+        cosOk = v.ok;
+        if (!v.ok && process.env.MOCK_DEBUG) {
+          process.stderr.write(`[mock-tencent] COS 验签失败 ${req.method} ${req.url}\n  got=${v.got} expected=${v.expected}\n`);
+        }
+      }
+      calls.push({ action: 'PutBucket', service: 'cos', sigOk: cosOk, body: null, credSecretId });
+      if (!cosOk) {
+        res.writeHead(401, { 'Content-Type': 'application/xml' });
+        return res.end(`<?xml version="1.0" encoding="UTF-8"?><Error><Code>SignatureMismatch</Code><Message>mock cos 验签失败</Message></Error>`);
+      }
+      res.writeHead(200, { 'Content-Type': 'application/xml', 'x-cos-request-id': 'mock-cos-' + Date.now().toString(36) });
+      return res.end('');
+    }
 
     const actionLower = req.headers['x-tc-action'];
     const action = actionLower ? actionLower[0].toUpperCase() + actionLower.slice(1) : '';

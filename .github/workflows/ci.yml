@@ -60,8 +60,10 @@ jobs:
           npx wrangler --version
           test -f node_modules/workerd/bin/workerd && echo "workerd present"
 
-      - name: TC3 verifier self-test
-        run: node integration/tc3-verify.mjs
+      - name: Verifier self-tests (TC3 + COS v5)
+        run: |
+          node integration/tc3-verify.mjs
+          node integration/cos-sign-verify.mjs
 
       - name: Run all integration scenarios
         run: node integration/run-all.mjs

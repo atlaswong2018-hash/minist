@@ -35,6 +35,8 @@ export interface Env {
    * 指向本地 mock,如 `http://localhost:9999`)。生产留空。
    */
   TENCENT_API_BASE?: string;
+  /** COS API 基地址覆写(联调用,指向本地 mock)。生产留空,走真实 cos.<region>.myqcloud.com。 */
+  COS_API_BASE?: string;
   /** Cloudflare API Token(方案一:自动创建 KV/D1/R2)。 */
   CF_API_TOKEN?: string;
   /** Cloudflare Account ID。 */
