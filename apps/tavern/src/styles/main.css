@@ -1,0 +1,103 @@
+/**
+ * minist 酒馆全局样式 — 暗色主题、移动端安全区、响应式基础。
+ *
+ * 设计令牌:
+ *  - 背景层次:#15151f(最深)→ #1a1a26 → #1f1f2e → #26263a(卡片)
+ *  - 主色:#8b5cf6(紫);强调:#c4b5fd
+ *  - 文字:#e4e4e7 / #a1a1aa / #71717a
+ *  - 危险:#dc2626 / #ef4444
+ *
+ * 移动专项:
+ *  - 安全区:env(safe-area-inset-*) + 100vh 用 var(--vh) 修正(微信浏览器地址栏伸缩)
+ *  - font-size >= 16px 防 iOS Safari 聚焦缩放
+ *  - -webkit-tap-highlight-color 透明,防点击灰块
+ *  - touch-action 优化(输入区允许滚动,聊天区禁双指缩放)
+ */
+
+:root {
+  --vh: 1vh;
+  --color-bg-0: #15151f;
+  --color-bg-1: #1a1a26;
+  --color-bg-2: #1f1f2e;
+  --color-bg-3: #26263a;
+  --color-primary: #8b5cf6;
+  --color-primary-light: #c4b5fd;
+  --color-text: #e4e4e7;
+  --color-text-muted: #a1a1aa;
+  --color-text-faint: #71717a;
+  --color-danger: #dc2626;
+  --safe-top: env(safe-area-inset-top);
+  --safe-bottom: env(safe-area-inset-bottom);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--color-bg-0);
+  color: var(--color-text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif;
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+  /* 防 iOS 点击灰块 */
+  -webkit-tap-highlight-color: transparent;
+  /* 禁用文本选择(聊天内容除外) */
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#app {
+  height: 100%;
+}
+
+/* 允许消息内容选择复制 */
+.tavern-bubble__content {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* 滚动条 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* 输入元素字号 >= 16px 防 iOS 聚焦缩放 */
+input,
+textarea,
+select {
+  font-size: 15px;
+}
+
+/* 按钮基础 */
+button {
+  font-family: inherit;
+}
+
+/* 移动端:禁用双指缩放(配合 viewport meta) */
+@supports (touch-action: pan-x pan-y) {
+  body {
+    touch-action: pan-x pan-y;
+  }
+}
+
+/* 链接颜色 */
+a {
+  color: var(--color-primary-light);
+}

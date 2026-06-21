@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+jobs:
+  build:
+    name: Typecheck & Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Typecheck (all workspaces)
+        run: npm run typecheck
+
+      - name: Build frontends
+        run: |
+          npm run build --workspace @minist/tavern
+          npm run build --workspace @minist/platform
+
+      - name: Verify SCF loads
+        run: node -e "require('./packages/scf-tencent/src/index.js'); console.log('scf-ok')"

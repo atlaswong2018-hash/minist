@@ -1,0 +1,27 @@
+{
+  "name": "@minist/tavern",
+  "version": "0.1.0",
+  "private": true,
+  "description": "minist 酒馆前端 SPA — Vue3 + Vite + Pinia,适配手机与微信内置浏览器。",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "vue-tsc --noEmit"
+  },
+  "dependencies": {
+    "@minist/core": "*",
+    "@minist/shared": "*",
+    "idb": "^8.0.0",
+    "pinia": "^2.2.6",
+    "vue": "^3.5.13"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.1",
+    "typescript": "~5.6.3",
+    "vite": "^5.4.11",
+    "vue-tsc": "^2.1.10"
+  }
+}

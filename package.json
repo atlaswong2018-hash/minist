@@ -1,0 +1,44 @@
+{
+  "name": "minist",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MiniTavern (minist) — 免备案 Serverless 酒馆(SillyTavern)裁剪移植 + 一键部署平台。纯前端 SPA + 极薄 Cloudflare/腾讯云 SCF 后端,适配手机与微信内置浏览器。",
+  "license": "AGPL-3.0-only",
+  "author": "minist contributors",
+  "homepage": "https://github.com/minist-tavern/minist",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/minist-tavern/minist.git"
+  },
+  "keywords": [
+    "sillytavern",
+    "agnai",
+    "character-card",
+    "cloudflare-workers",
+    "tencent-scf",
+    "serverless",
+    "llm-chat",
+    "roleplay",
+    "pwa"
+  ],
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "dev:tavern": "npm run dev --workspace @minist/tavern",
+    "dev:platform": "npm run dev --workspace @minist/platform",
+    "dev:worker": "npm run dev --workspace @minist/worker-cloudflare",
+    "dev:scf": "npm run dev --workspace @minist/scf-tencent"
+  },
+  "engines": {
+    "node": ">=18.18.0"
+  },
+  "packageManager": "npm@10.8.2",
+  "devDependencies": {
+    "@types/node": "^20.19.43"
+  }
+}

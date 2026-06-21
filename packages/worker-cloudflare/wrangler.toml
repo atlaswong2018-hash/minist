@@ -1,0 +1,50 @@
+# wrangler.toml — minist Cloudflare Worker 配置
+#
+# 部署步骤:
+#   1. npx wrangler login
+#   2. 在 CF 控制台(或 wrangler 命令)创建下方 KV / D1 / R2 资源,
+#      把返回的 id 填到对应绑定块。
+#   3. 把 Worker URL(wrangler deploy 后输出)填回酒馆前端 apiBaseUrl。
+#
+# 资源创建命令(任选其一,推荐命令行):
+#   KV : npx wrangler kv namespace create SillyKV       → 复制 id 到下方
+#   D1 : npx wrangler d1 create sillydb                 → 复制 database_id
+#   R2 : npx wrangler r2 bucket create silly-r2        (R2 无需 id,用 bucket 名)
+# 或在 Cloudflare 控制台 → Workers & Pages → KV / D1 / R2 页面手动创建。
+
+name = "minist-worker"
+main = "src/index.ts"
+compatibility_date = "2024-09-01"
+
+# 可观测性:开启后可在 CF 控制台查看请求量、CPU 时间、日志。
+[observability]
+enabled = true
+
+# ─── KV 绑定:角色卡索引等读多写少数据 ───────────────────────────────
+# CF KV 真实约束:免费版写入仅 1,000 次/天(最紧瓶颈)。
+# 因此只把"读多写少"的 characters / worldinfo / presets 索引放这里。
+# 频繁追加的聊天记录请走 D1(见下,10 万写/天)。
+#
+# [[kv_namespaces]]
+# binding = "SillyKV"
+# id = "<在控制台或 wrangler kv namespace create 后填入>"
+
+# ─── D1 绑定:聊天历史 + 世界书追加(频繁写) ────────────────────────
+# D1 真实约束:免费版 10 万行写入/天,远高于 KV,适合聊天追加。
+#
+# [[d1_databases]]
+# binding = "SillyDB"
+# database_name = "sillydb"
+# database_id = "<在控制台或 wrangler d1 create 后填入>"
+
+# ─── R2 绑定:人物卡 PNG 图片(免出流量费) ──────────────────────────
+# R2 真实约束:无出流量费(egress free),手机加载人物卡图片免费。
+# 存储额度免费版 10GB,足够大量人物卡。
+#
+# [[r2_buckets]]
+# binding = "SillyR2"
+# bucket_name = "silly-r2"
+
+# ─── 环境变量 / Secrets ────────────────────────────────────────────
+# secrets 用 `npx wrangler secret put NAME` 写入(不进仓库)。
+# 详见 .dev.vars.example。

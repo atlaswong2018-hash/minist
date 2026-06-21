@@ -1,0 +1,17 @@
+#!/bin/bash
+# minist SCF Web 函数启动入口
+#
+# SCF Web 函数要求:存在可执行的 scf_bootstrap 文件,启动监听 0.0.0.0:9000 的 Web Server。
+# 部署前务必 chmod +x scf_bootstrap(平台不会自动加可执行位)。
+#
+# Node.js 运行时内置路径参考(SCF 控制台 Nodejs18.15 镜像):
+#   /var/lang/node18/bin/node
+# 若 SCF 升级了 Node 版本,改此处对应的路径即可。
+#
+# 参考文档:
+#   https://cloud.tencent.com/document/product/583/56126 (启动文件说明)
+#   https://cloud.tencent.com/document/product/583/56124 (Web 函数概述)
+
+export NODE_ENV=production
+
+/var/lang/node18/bin/node src/index.js

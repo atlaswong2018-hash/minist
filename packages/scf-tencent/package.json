@@ -1,0 +1,35 @@
+{
+  "name": "@minist/scf-tencent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "minist 腾讯云 SCF Web 函数后端——极薄 Serverless,独立打包上传,免备案部署。",
+  "license": "AGPL-3.0-only",
+  "author": "minist contributors",
+  "homepage": "https://github.com/minist-tavern/minist",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/minist-tavern/minist.git"
+  },
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "node src/index.js",
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.2",
+    "cos-nodejs-sdk-v5": "^2.14.4",
+    "express": "^4.19.2",
+    "tencentcloud-sdk-nodejs-scf": "^4.0.1000"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "sillytavern",
+    "tencent-scf",
+    "serverless",
+    "llm-proxy",
+    "streaming",
+    "cos"
+  ]
+}

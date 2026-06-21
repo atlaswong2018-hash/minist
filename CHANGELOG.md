@@ -1,0 +1,48 @@
+# Changelog
+
+本仓库所有重要变更记录于此。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/),遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
+
+## [Unreleased]
+
+### 计划中
+- 精确 tokenizer(替换启发式 token 估算)
+- 人物卡可视化编辑器
+- 完整组队聊天(Group Chat)自动轮询(降级版现为手动触发)
+- 向量检索增强的 AI 部署助手
+- EdgeOne 方案文档与脚本
+
+## [0.1.0] - 2026-06-21
+
+### 🎉 首个可用版本(MVP,全模块纵向贯通)
+
+#### 新增 — 架构与契约
+- `@minist/shared`:全栈共享契约(路由常量 / `X-Crypto-Data` 加密协议 / `TavernConfig` `SyncPayload` 类型 / API 信封 / SSE 解析 / UTF-8 安全 Base64)。
+- npm workspaces monorepo 脚手架、根 tsconfig、`.gitignore`、AGPL-3.0 LICENSE、CONTRIBUTING。
+
+#### 新增 — 核心逻辑 `@minist/core`
+- 人物卡 **V2/V3** 解析:纯浏览器 PNG `tEXt` chunk 解析器(`chara` / `ccv3`,`ccv3` 优先),自包含 CRC32,写回 PNG 幂等。
+- 卡片规范化(`normalizeCard`,V1→V2 提升)、校验。
+- 世界书条目结构与基础激活(constant / key / selective / case_sensitive)。
+- Prompt 构建(`buildMessages`)+ 启发式 token 估算 + 上下文裁剪。
+
+#### 新增 — 后端
+- `@minist/worker-cloudflare`:CF Worker —— KV(`/api/storage`)/ D1(`/api/chat`)/ R2(`/api/r2`)、`/api/sync`、`/v1/chat/completions` 流式透传(请求侧 Base64 解混淆)、`/api/grant-config`(CAM 中转 + TC3-HMAC-SHA256 签名)、`/api/cf-setup`(CF REST 建资源)、`wrangler.toml`。
+- `@minist/scf-tencent`:腾讯云 SCF Web 函数(CommonJS)—— COS 同步、COS Presigned URL 直传、流式 `axios`→`pipe`+`on('end')` 主动释放防扣费、`/api/admin/set-timeout`(方案二 Token 自改,`UpdateFunctionConfiguration` 自锁 60s/128MB)、`serverless.yml`、`scf_bootstrap`。
+
+#### 新增 — 前端
+- `@minist/tavern`:Vue3 + Pinia 酒馆 SPA —— 聊天/流式打字机/中断/重取、人物卡触控导入、世界书管理、设置(后端切换/crypto/温度)、IndexedDB 本地存储 + 导出/恢复/清空、后端适配层(Local/Cloudflare/Tencent)、PWA、移动/微信专项(独立发送按钮、防缩放、hash 文件名、`visibilitychange` 重连、安全区)。
+- `@minist/platform`:案例部署平台 —— 首页资源清单、CF 向导、腾讯 CAM 向导(方案一)+ Token 自改向导(方案二)、配置面板、角色卡/世界书同步中心、AI 部署助手。
+- `@minist/deploy-agent`:系统 prompt + 15 条结构化避坑知识库 + 关键词检索。
+
+#### 新增 — 文档与示例
+- `README.md`、`docs/architecture.md`、`docs/deploy-cloudflare.md`、`docs/deploy-tencent.md`、`docs/cost.md`。
+- `examples/`:示例人物卡(`sample-xiaoman.json`,V2)+ 示例世界书。
+- GitHub CI(typecheck + build)、Issue/PR 模板。
+
+### ⚠️ 已知边界
+- CAM 跨账号授权(方案一)代码完整,需真实腾讯云凭证端到端验证;方案二(Token 自改)可即时自测。
+- CF `/api/cf-setup`、CAM STS 中转需对应平台真实 API Token 验证。
+- 前端为精简实现,非 SillyTavern 功能满血;token 计数为启发式。
+
+[Unreleased]: https://github.com/minist-tavern/minist/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/minist-tavern/minist/releases/tag/v0.1.0
