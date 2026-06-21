@@ -97,8 +97,11 @@ export class CloudflareAdapter implements BackendAdapter {
   }
 
   async saveCard(card: CharacterCard): Promise<void> {
-    const url = joinUrl(this.base, ROUTES.storage);
-    const { body, extra } = this.wrapBody({ key: 'characters', value: card });
+    // Worker 契约:POST /api/storage/:key,body 为原始 value(可选 Base64 混淆)。
+    const cardObj = card as { data?: { name?: string }; name?: string };
+    const name = cardObj.data?.name ?? cardObj.name ?? 'card';
+    const url = joinUrl(this.base, ROUTES.storage) + '/card:' + encodeURIComponent(name);
+    const { body, extra } = this.wrapBody(card);
     const resp = await fetch(url, {
       method: 'POST',
       headers: { ...this.headers(this.cfg.crypto), ...extra },
@@ -108,23 +111,8 @@ export class CloudflareAdapter implements BackendAdapter {
   }
 
   async loadCards(): Promise<unknown[]> {
-    const url = joinUrl(this.base, ROUTES.storage) + '/characters';
-    const resp = await fetch(url, { headers: this.headers(false) });
-    if (!resp.ok) return [];
-    const env = (await resp.json().catch(() => ({ success: false, error: 'parse' }))) as ApiEnvelope<
-      { value?: unknown } | unknown[]
-    >;
-    let data: unknown;
-    try {
-      data = unwrapOrThrow(env);
-    } catch {
-      return [];
-    }
-    if (Array.isArray(data)) return data;
-    if (data && typeof data === 'object' && 'value' in (data as Record<string, unknown>)) {
-      const v = (data as { value: unknown }).value;
-      return Array.isArray(v) ? v : [];
-    }
+    // Worker 的 /api/storage/:key 是单 key 读写,无列表接口。
+    // 云端角色卡的批量管理请走「同步」(POST/GET /api/sync,loadAll/replaceAll)。
     return [];
   }
 

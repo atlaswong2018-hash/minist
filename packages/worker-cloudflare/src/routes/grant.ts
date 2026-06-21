@@ -12,10 +12,12 @@
  *   ② 用临时凭证调 SCF UpdateFunctionConfiguration(Timeout=60, MemorySize=128)。
  *   ③ (可选)用临时凭证调 COS CreateBucket 为用户建存储桶。
  *
+ * 联调支持:env.TENCENT_API_BASE 可把 Worker 对腾讯云 API 的请求整体指向
+ *   本地 mock(如 http://localhost:9999),用于端到端验证 TC3 签名与流程,
+ *   生产留空。
+ *
  * ⚠️ 需真实凭证验证的步骤(本文件尽力实现,标注 TODO):
  *   - STS 换临时凭证:GetFederationToken(简单)或 AssumeRoleWithWebIdentity(OIDC)。
- *     真实 code→credentials 映射需对接腾讯云 OAuth 回调,本实现用 GetFederationToken
- *     作为"尽力版本":即用主账号密钥签发一个最小权限临时凭证(适合个人/演示部署)。
  *   - UpdateFunctionConfiguration:需临时凭证具备 scf:UpdateFunctionConfiguration 权限。
  *   - CreateBucket:需临时凭证具备 cos:PutBucket 权限 + 合规地域。
  *
@@ -28,6 +30,22 @@ import type { Env } from '../env';
 import { jsonCors } from '../cors';
 import { signTc3 } from '../tc3';
 import { HEADERS } from '@minist/shared';
+
+/**
+ * 解析腾讯云 API 端点(支持 TENCENT_API_BASE 覆写以指向本地 mock)。
+ * 返回完整请求 url 与用于 TC3 签名的 host(二者必须一致,否则验签失败)。
+ */
+function tencentEndpoint(
+  apiBase: string | null | undefined,
+  service: string,
+): { url: string; host: string } {
+  if (apiBase) {
+    const base = apiBase.replace(/\/+$/, '');
+    return { url: base, host: base.replace(/^https?:\/\//, '') };
+  }
+  const host = `${service}.tencentcloudapi.com`;
+  return { url: `https://${host}`, host };
+}
 
 /** grant 请求体。 */
 interface GrantRequest {
@@ -74,6 +92,7 @@ export async function handleGrantConfig(request: Request, env: Env): Promise<Res
     return jsonCors(err('missing functionName', 'BAD_REQUEST'), 400);
   }
   const region = body.region || env.TENCENT_REGION || 'ap-guangzhou';
+  const apiBase = env.TENCENT_API_BASE;
 
   const results: Record<string, unknown> = { code: code.slice(0, 4) + '***', functionName: body.functionName, region };
 
@@ -82,7 +101,7 @@ export async function handleGrantConfig(request: Request, env: Env): Promise<Res
   //   AssumeRoleWithWebIdentity(STS:2018-08-13)用 code 换 credentials。
   //   此处实现 GetFederationToken 作为"个人部署"的尽力版本:
   //   用主账号密钥签发一个最小权限临时凭证(有效期 1 小时),供后续 SCF/COS 调用复用。
-  const stsCreds = await getFederationToken(env, region, code).catch((e) => {
+  const stsCreds = await getFederationToken(env, region, code, apiBase).catch((e) => {
     results.stsError = (e as Error).message;
     return null;
   });
@@ -104,6 +123,7 @@ export async function handleGrantConfig(request: Request, env: Env): Promise<Res
     region,
     body.functionName,
     { timeout: 60, memorySize: 128 },
+    apiBase,
   ).catch((e) => ({ ok: false, error: (e as Error).message }));
   results.scfUpdate = scfRes;
 
@@ -124,6 +144,7 @@ export async function handleGrantConfig(request: Request, env: Env): Promise<Res
         region,
         body.bucketName,
         appid,
+        apiBase,
       ).catch((e) => ({ ok: false, error: (e as Error).message }));
       results.cosBucket = cosRes;
     }
@@ -151,6 +172,7 @@ async function getFederationToken(
   env: Env,
   region: string,
   _code: string,
+  apiBase: string | null | undefined,
 ): Promise<TcCredentials> {
   const payload = JSON.stringify({
     Name: 'minist-grant',
@@ -173,6 +195,7 @@ async function getFederationToken(
     }),
   });
 
+  const ep = tencentEndpoint(apiBase, 'sts');
   const sig = await signTc3({
     secretId: env.TENCENT_SECRET_ID!,
     secretKey: env.TENCENT_SECRET_KEY!,
@@ -182,9 +205,10 @@ async function getFederationToken(
     version: '2018-08-13',
     payload,
     timestamp: Math.floor(Date.now() / 1000),
+    host: ep.host,
   });
 
-  const res = await fetch(`https://${sig.host}`, {
+  const res = await fetch(ep.url, {
     method: 'POST',
     headers: sig.headers,
     body: payload,
@@ -210,6 +234,7 @@ async function updateScfFunctionConfig(
   region: string,
   functionName: string,
   opts: { timeout: number; memorySize: number },
+  apiBase: string | null | undefined,
 ): Promise<{ ok: boolean; requestId?: string; error?: string }> {
   const payload = JSON.stringify({
     FunctionName: functionName,
@@ -218,6 +243,7 @@ async function updateScfFunctionConfig(
     MemorySize: opts.memorySize,
   });
 
+  const ep = tencentEndpoint(apiBase, 'scf');
   const sig = await signTc3({
     secretId: creds.TmpSecretId,
     secretKey: creds.TmpSecretKey,
@@ -227,10 +253,11 @@ async function updateScfFunctionConfig(
     version: '2018-04-16',
     payload,
     timestamp: Math.floor(Date.now() / 1000),
+    host: ep.host,
     extraHeaders: { 'x-tc-token': creds.Token },
   });
 
-  const res = await fetch(`https://${sig.host}`, {
+  const res = await fetch(ep.url, {
     method: 'POST',
     headers: sig.headers,
     body: payload,
@@ -258,6 +285,7 @@ async function createCosBucket(
   region: string,
   bucketName: string,
   appid: string,
+  apiBase: string | null | undefined,
 ): Promise<{ ok: boolean; requestId?: string; error?: string }> {
   // 注意:COS 推荐用 XML API(PutBucket),签名算法是 cos v5。
   // 此处走 TC3 调 cos-intl/CreateBucket 作为骨架实现(需真实验证)。
@@ -267,6 +295,7 @@ async function createCosBucket(
     Region: region,
   });
 
+  const ep = tencentEndpoint(apiBase, 'cos');
   const sig = await signTc3({
     secretId: creds.TmpSecretId,
     secretKey: creds.TmpSecretKey,
@@ -276,10 +305,11 @@ async function createCosBucket(
     version: '2018-04-16',
     payload,
     timestamp: Math.floor(Date.now() / 1000),
+    host: ep.host,
     extraHeaders: { 'x-tc-token': creds.Token },
   });
 
-  const res = await fetch(`https://${sig.host}`, {
+  const res = await fetch(ep.url, {
     method: 'POST',
     headers: sig.headers,
     body: payload,

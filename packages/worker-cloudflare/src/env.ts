@@ -30,6 +30,11 @@ export interface Env {
   TENCENT_ROOT_UIN?: string;
   /** 腾讯云默认地域。 */
   TENCENT_REGION?: string;
+  /**
+   * 腾讯云 API 基地址覆写(仅用于联调/自测,把 Worker 对腾讯 API 的请求
+   * 指向本地 mock,如 `http://localhost:9999`)。生产留空。
+   */
+  TENCENT_API_BASE?: string;
   /** Cloudflare API Token(方案一:自动创建 KV/D1/R2)。 */
   CF_API_TOKEN?: string;
   /** Cloudflare Account ID。 */

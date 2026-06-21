@@ -201,10 +201,11 @@ export function adminSetTimeout(
     {
       method: 'POST',
       body: JSON.stringify({
+        // 字段名对齐 SCF admin.js 读取的字段(memorySize / instanceConcurrency),
+        // 否则内存与并发配置会静默失效。
         timeout: opts.timeout ?? 60,
-        memory: opts.memory ?? 128,
-        concurrency: opts.concurrency ?? 1,
-        retry: false, // 关失败重试(防爆产)
+        memorySize: opts.memory ?? 128,
+        instanceConcurrency: opts.concurrency ?? 1,
       }),
       headers: { [HEADERS.adminToken]: adminToken },
     },

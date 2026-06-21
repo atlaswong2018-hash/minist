@@ -33,6 +33,20 @@ function createScfClient() {
   const ScfClient = tencentcloud.scf.v20180416.Client;
 
   const region = process.env.TENCENTCLOUD_REGION || 'ap-guangzhou';
+  // SCF_API_ENDPOINT 仅用于联调/自测,把 SDK 对腾讯 SCF API 的请求指向本地 mock。
+  // 生产留空,默认走官方 scf.<region>.tencentcloudapi.com(https)。
+  // 腾讯云 SDK 的 endpoint 只接受主机名,协议由 httpProfile.protocol 控制,
+  // 故当 SCF_API_ENDPOINT 含 http:// 前缀时拆分设置(允许 http 本地 mock)。
+  const httpProfile = { endpoint: 'scf.' + region + '.tencentcloudapi.com' };
+  if (process.env.SCF_API_ENDPOINT) {
+    const m = process.env.SCF_API_ENDPOINT.match(/^(https?:)\/\/(.+)$/);
+    if (m) {
+      httpProfile.protocol = m[1] + '//';
+      httpProfile.endpoint = m[2].replace(/\/+$/, '');
+    } else {
+      httpProfile.endpoint = process.env.SCF_API_ENDPOINT;
+    }
+  }
   const clientConfig = {
     credential: {
       secretId: process.env.TENCENTCLOUD_SECRETID,
@@ -40,9 +54,7 @@ function createScfClient() {
       token: process.env.TENCENTCLOUD_SESSIONTOKEN,
     },
     region,
-    profile: {
-      httpProfile: { endpoint: 'scf.' + region + '.tencentcloudapi.com' },
-    },
+    profile: { httpProfile },
   };
   return new ScfClient(clientConfig);
 }
