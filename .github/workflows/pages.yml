@@ -1,17 +1,22 @@
-name: Deploy Platform to Pages
+name: Deploy Demo to Pages
 
-# 把案例部署平台(apps/platform)构建并发布到 GitHub Pages,
-# 得到在线"案例网站":https://atlaswong2018-hash.github.io/minist/
-# 访客可在该网页选平台(CF/腾讯)、看向导、调 AI 部署助手。
+# 发布到 GitHub Pages,得到两个在线站点:
+#   - 在线 demo(酒馆 tavern,可真实聊天,本地模式自带 API Key):https://<owner>.github.io/minist/
+#   - 案例部署平台 platform(选 CF/腾讯、一键部署向导、AI 助手):https://<owner>.github.io/minist/platform/
 #
-# 一次性前提:仓库 Settings → Pages → Build and deployment → Source 选 "GitHub Actions"。
+# tavern 与 platform 都用 vite base './' (相对路径),故 platform 放子路径 /platform/ 资源也能正确加载。
+#
+# ⚠️ 一次性前提:仓库 Settings → Pages → Build and deployment → Source 必须选 "GitHub Actions"。
+#    没启用时 deploy-pages 会失败、站点 404。
 
 on:
   push:
     branches: [main]
     paths:
+      - 'apps/tavern/**'
       - 'apps/platform/**'
       - 'packages/shared/**'
+      - 'packages/core/**'
       - 'packages/deploy-agent/**'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
@@ -21,7 +26,6 @@ permissions:
   pages: write
   id-token: write
 
-# 同一时间只跑一个 Pages 部署,新的取消旧的。
 concurrency:
   group: pages
   cancel-in-progress: true
@@ -44,13 +48,26 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Build platform (案例部署平台)
+      - name: Build tavern (在线 demo,根路径)
+        run: npm run build --workspace @minist/tavern
+
+      - name: Build platform (案例部署站,/platform/)
         run: npm run build --workspace @minist/platform
+
+      - name: Assemble site (tavern → 根,platform → /platform/)
+        run: |
+          set -e
+          mkdir -p site/platform
+          cp -a apps/tavern/dist/. site/
+          cp -a apps/platform/dist/. site/platform/
+          echo "minist GitHub Pages 站点" > site/about.txt
+          echo "根 = tavern 在线 demo; /platform/ = 案例部署平台" >> site/about.txt
+          find site -maxdepth 2 -type f | sort
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: apps/platform/dist
+          path: site
 
       - name: Deploy to GitHub Pages
         id: deployment

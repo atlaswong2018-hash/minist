@@ -71,22 +71,23 @@ git push origin --tags
 - **Issues / Discussions**:Settings → Features 按需开启(Issue 模板已就绪)。
 - **Security**:Settings → Code security → 开启 Dependabot(`.github/dependabot.yml` 已配)、Secret scanning(若可用)。
 
-## 4. 把案例部署平台发布到 GitHub Pages
+## 4. 把在线 demo + 案例站发布到 GitHub Pages
 
-`apps/platform`(案例部署平台)是纯静态站,仓库已内置部署工作流
-`.github/workflows/pages.yml`:推送到 `main` 且改动涉及 `apps/platform`、`packages/shared`、
-`packages/deploy-agent` 时自动构建并发布到 Pages,得到在线"案例网站":
+仓库内置 `.github/workflows/pages.yml`,一次部署两个站点:
 
-```
-https://<OWNER>.github.io/minist/
-```
+| 路径 | 内容 |
+|---|---|
+| `https://<OWNER>.github.io/minist/` | **在线 demo**(酒馆 tavern):可真实聊天,设置里填自己的 LLM API Key 即用 |
+| `https://<OWNER>.github.io/minist/platform/` | **案例部署平台**:选 CF/腾讯、一键部署向导、AI 助手 |
 
-**一次性前提**:仓库 Settings → Pages → Build and deployment → Source 选 **"GitHub Actions"**
-(不是 branch)。设好后,下次符合条件的 push 即触发部署。
+**一次性前提(否则 404)**:仓库 Settings → Pages → Build and deployment → Source 选
+**"GitHub Actions"**(不是 branch)。设好后,改 tavern/platform/shared/core/deploy-agent 任一
+推送到 `main` 即触发;也可在 Actions 页手动 `Run workflow`。
 
 本地构建验证:
 
 ```bash
+npm run build --workspace @minist/tavern
 npm run build --workspace @minist/platform
 ```
 
