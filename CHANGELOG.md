@@ -4,6 +4,15 @@
 
 ## [Unreleased]
 
+### 已完成 — 端到端联调(三条部署方案全绿)
+- 新增 `integration/` 集成联调 harness:mock LLM(SSE)+ mock 腾讯云 API(自签 HTTPS)+ 真实 CF Worker(wrangler dev)/ 腾讯云 SCF,在没有真实云凭证下端到端跑通。
+- `tc3-verify.mjs` 用独立 Node `crypto` 反向验证 TC3-HMAC-SHA256;**方案一 strict 验签通过**,证明 Worker `signTc3`(Web Crypto 实现)对主密钥(STS)与临时密钥(SCF)签名均正确,临时凭证链路无误。
+- 联调发现并修复的真实 bug:
+  - 平台↔SCF 字段名不匹配(发 `memory`/`concurrency`、读 `memorySize`/`instanceConcurrency`)→ 内存/并发配置静默失效,已对齐。
+  - 腾讯 SDK `endpoint` 只接受主机名(协议由 `httpProfile.protocol` 控制)→ `SCF_API_ENDPOINT` 现拆分 `scheme://host`。
+  - Worker 腾讯 API base 不可覆写 → `grant.ts` 新增 `TENCENT_API_BASE` env(也利于 staging)。
+  - tavern↔Worker storage 路由不匹配(POST `/api/storage` vs 要求 `/api/storage/:key` 会 404)→ 已对齐,云端角色卡批量管理走 `sync`。
+
 ### 计划中
 - 精确 tokenizer(替换启发式 token 估算)
 - 人物卡可视化编辑器

@@ -1,0 +1,14 @@
+{
+  "name": "minist-integration",
+  "version": "0.0.0",
+  "private": true,
+  "description": "minist 端到端集成联调 harness:mock LLM + mock 腾讯云 API + 真实 Worker/SCF 跑通三条部署方案。",
+  "type": "module",
+  "scripts": {
+    "tc3": "node tc3-verify.mjs",
+    "token": "node run-tencent-token.mjs",
+    "cam": "node run-tencent-cam.mjs",
+    "cf": "node run-cf-core.mjs",
+    "all": "node run-all.mjs"
+  }
+}

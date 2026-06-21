@@ -1,0 +1,25 @@
+# wrangler.test.toml — 本地联调/自测配置(带本地 KV/D1/R2 绑定)。
+# 用法:npx wrangler dev -c wrangler.test.toml --local --port 8787
+# 本地模式无需 CF 账号登录;id/database_id 可为任意值,miniflare 自动建本地状态。
+name = "minist-worker-test"
+main = "src/index.ts"
+compatibility_date = "2024-09-01"
+
+[observability]
+enabled = false
+
+# KV:角色卡索引(读多写少)
+[[kv_namespaces]]
+binding = "SillyKV"
+id = "minist-test-kv"
+
+# D1:聊天/世界书(频繁追加)
+[[d1_databases]]
+binding = "SillyDB"
+database_name = "minist-test-db"
+database_id = "00000000-0000-0000-0000-000000000000"
+
+# R2:人物卡 PNG(无出流量费)
+[[r2_buckets]]
+binding = "SillyR2"
+bucket_name = "minist-test"
