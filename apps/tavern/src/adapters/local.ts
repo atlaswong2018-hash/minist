@@ -36,6 +36,19 @@ export class LocalAdapter implements BackendAdapter {
     throw new Error('本地直连模式无对象存储');
   }
 
+  async listCards(): Promise<string[]> {
+    throw new Error('本地直连模式不支持云同步');
+  }
+  async getCard(_id: string): Promise<string | null> {
+    throw new Error('本地直连模式不支持云同步');
+  }
+  async putCard(_id: string, _json: string): Promise<void> {
+    throw new Error('本地直连模式不支持云同步');
+  }
+  async deleteCard(_id: string): Promise<void> {
+    throw new Error('本地直连模式不支持云同步');
+  }
+
   async chat(messages: ChatMessage[], opts: ChatOptions = {}): Promise<ChatStreamHandle> {
     const base = (this.cfg.apiBaseUrl || '').replace(/\/$/, '');
     const apiKey = this.cfg.apiKey;

@@ -88,12 +88,12 @@
 - [x] 冷卡仅元数据常驻,二进制按需拉取缓存(S1 useAsset 已实现)
 - [x] 验证:typecheck + build 全绿;**超量淘汰真机 e2e 待用户环境**
 
-### Phase S3 — 元数据分片(全库膨胀,单对象超限)
-- [ ] CF sync.ts:characters/worldinfo 从单值改为 per-card(`sync:uid:char:<id>`)+ 索引(`sync:uid:char-index`)
-- [ ] CF sync:增量同步(仅变更卡),省 1000 写/天额度;前端按需拉单卡
-- [ ] Tencent sync.js:从单 blob 改为 per-card 对象(`minist_users/<uid>/cards/<id>.json`)+ 索引对象
-- [ ] SyncPayload 拆为「索引清单」;前端按需拉单卡元数据
-- [ ] 验证:模拟 1000+ 卡,各 KV/COS 单对象 <25MB;增量同步只写变更
+### Phase S3 — 元数据分片(全库膨胀,单对象超限)✅
+- [x] CF sync.ts:characters 从单值改为 per-card(`sync:<uid>:char:<id>`);用 **前缀枚举(KV.list)** 替代单独索引(无额外写);worldinfo/presets/config 仍单值(典型小)
+- [x] CF sync:downloadSync 返回 characters=[],角色走粒度路由 GET /api/sync/cards/:uid + GET/PUT/DELETE /api/sync/card/:uid/:cardId
+- [x] Tencent sync.js + cos.js:per-card COS 对象(`minist_users/<uid>/cards/<id>.json`)+ getBucket 枚举 + putObject/getObject/deleteObject 同路径路由
+- [x] 前端增量同步:BackendAdapter 加 listCards/getCard/putCard/deleteCard(CF 实现,Tencent 继承,local 抛错);LocalCharacter 加 updatedAt;删除记 deletedCardIds 待传;SyncPanel.syncUp 仅传变更/删除卡,syncDown 粒度拉取
+- [x] 验证:shared/core/worker-cf typecheck + tavern build 全绿;scf 语法 OK(bodyParser 10mb 够内嵌卡);**1000+ 卡 e2e 待用户环境**
 
 ### Phase S4 — 同步瘦身 + 跨用户共享
 - [ ] SyncPayload 只含元数据 + 引用清单(无二进制)

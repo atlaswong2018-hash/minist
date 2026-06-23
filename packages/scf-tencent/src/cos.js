@@ -77,4 +77,28 @@ function getObjectUrl(params) {
   return cos.getObjectUrl(params);
 }
 
-module.exports = { getCos, putObject, getObject, getObjectUrl, BUCKET, REGION };
+/** Promise 包装的 cos.getBucket(列出对象,Phase S3 角色卡枚举用)。 */
+function listObjects(params) {
+  const cos = getCos();
+  if (!cos) return Promise.reject(new Error('COS 未配置:缺少 COS_BUCKET 环境变量'));
+  return new Promise((resolve, reject) => {
+    cos.getBucket(params, (err, data) => {
+      if (err) reject(err);
+      else resolve(data);
+    });
+  });
+}
+
+/** Promise 包装的 cos.deleteObject(Phase S3 角色卡删除用)。 */
+function deleteObject(params) {
+  const cos = getCos();
+  if (!cos) return Promise.reject(new Error('COS 未配置:缺少 COS_BUCKET 环境变量'));
+  return new Promise((resolve, reject) => {
+    cos.deleteObject(params, (err, data) => {
+      if (err) reject(err);
+      else resolve(data);
+    });
+  });
+}
+
+module.exports = { getCos, putObject, getObject, getObjectUrl, listObjects, deleteObject, BUCKET, REGION };

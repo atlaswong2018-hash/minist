@@ -132,6 +132,62 @@ export class CloudflareAdapter implements BackendAdapter {
     return resp.blob();
   }
 
+  // ── Phase S3:角色卡 per-card 粒度同步(TencentAdapter 继承本实现,SCF 同路径)──
+
+  private cardListUrl(): string {
+    return (
+      joinUrl(this.base, ROUTES.sync) +
+      '/cards/' +
+      encodeURIComponent(this.cfg.userId)
+    );
+  }
+  private cardUrl(id: string): string {
+    return (
+      joinUrl(this.base, ROUTES.sync) +
+      '/card/' +
+      encodeURIComponent(this.cfg.userId) +
+      '/' +
+      encodeURIComponent(id)
+    );
+  }
+
+  async listCards(): Promise<string[]> {
+    const resp = await fetch(this.cardListUrl(), { headers: this.headers(false) });
+    if (!resp.ok) throw new Error(`列卡失败 ${resp.status}`);
+    const env = (await resp.json().catch(() => ({ success: false, error: 'parse' }))) as ApiEnvelope<{
+      ids: string[];
+    }>;
+    return unwrapOrThrow(env).ids ?? [];
+  }
+
+  async getCard(id: string): Promise<string | null> {
+    const resp = await fetch(this.cardUrl(id), { headers: this.headers(false) });
+    if (resp.status === 404) return null;
+    if (!resp.ok) throw new Error(`取卡失败 ${resp.status}`);
+    const env = (await resp.json().catch(() => ({ success: false, error: 'parse' }))) as ApiEnvelope<{
+      data: string;
+    }>;
+    return unwrapOrThrow(env).data ?? null;
+  }
+
+  async putCard(id: string, json: string): Promise<void> {
+    const resp = await fetch(this.cardUrl(id), {
+      method: 'PUT',
+      headers: { ...this.headers(false), 'Content-Type': 'application/json' },
+      body: json,
+    });
+    if (!resp.ok) throw new Error(`写卡失败 ${resp.status}`);
+  }
+
+  async deleteCard(id: string): Promise<void> {
+    const resp = await fetch(this.cardUrl(id), {
+      method: 'DELETE',
+      headers: this.headers(false),
+    });
+    // 404 视为已删除,成功
+    if (!resp.ok && resp.status !== 404) throw new Error(`删卡失败 ${resp.status}`);
+  }
+
   async sync(payload: SyncPayload): Promise<void> {
     const url = joinUrl(this.base, ROUTES.sync);
     const { body, extra } = this.wrapBody(payload);

@@ -10,11 +10,14 @@
  */
 import { ref, computed, onMounted } from 'vue';
 import { useConfigStore } from '../store/config';
+import { useCharactersStore } from '../store/characters';
 import { loadAll, replaceAll, kvGet, kvPut } from '../db/idb';
 import { getAdapter } from '../adapters';
 import type { SyncPayload } from '@minist/shared';
+import type { LocalCharacter } from '../store/characters';
 
 const config = useConfigStore();
+const characters = useCharactersStore();
 
 const syncing = ref(false);
 const message = ref('');
@@ -39,12 +42,28 @@ async function syncUp(): Promise<void> {
   syncing.value = true;
   message.value = '';
   try {
-    const payload = await loadAll(config.config.userId);
     const adapter = getAdapter(config.config);
-    await adapter.sync(payload);
+    const since = lastSync.value ?? 0;
+    // 1. 非角色数据(worldinfo/presets/config/chats)批量;characters 走粒度
+    const full = await loadAll(config.config.userId);
+    await adapter.sync({ ...full, characters: [] });
+    // 2. 增量上传变更卡(updatedAt > since;首次同步 since=0 全量)
+    const changed = characters.list.filter((c) => (c.updatedAt ?? 0) > since);
+    let putN = 0;
+    for (const c of changed) {
+      await adapter.putCard(c.id, JSON.stringify(c));
+      putN++;
+    }
+    // 3. 推送本地删除
+    const deleted = await characters.drainDeletedCardIds();
+    let delN = 0;
+    for (const id of deleted) {
+      await adapter.deleteCard(id);
+      delN++;
+    }
     lastSync.value = Date.now();
     await kvPut(KV_LAST_SYNC, lastSync.value);
-    message.value = `已同步 ${payload.characters.length} 角色 / ${payload.chats.length} 对话 / ${payload.worldinfo.length} 世界书条目`;
+    message.value = `已同步:对话/世界书/预设 + ${putN} 张变更卡${delN ? `(删 ${delN} 张)` : ''}`;
   } catch (e) {
     message.value = '同步失败:' + (e instanceof Error ? e.message : String(e));
   } finally {
@@ -62,13 +81,32 @@ async function syncDown(): Promise<void> {
   message.value = '';
   try {
     const adapter = getAdapter(config.config);
-    const payload = (await adapter.pull()) as SyncPayload | null;
-    if (!payload) {
+    // 1. 非角色数据
+    const small = (await adapter.pull()) as SyncPayload | null;
+    if (!small) {
       message.value = '云端无数据可恢复。';
       return;
     }
-    await replaceAll(payload);
-    message.value = `已恢复 ${payload.characters.length} 角色 / ${payload.chats.length} 对话 / ${payload.worldinfo.length} 世界书条目。刷新页面生效。`;
+    // 2. 粒度拉取所有卡
+    const ids = await adapter.listCards();
+    const cards: LocalCharacter[] = [];
+    for (const id of ids) {
+      const json = await adapter.getCard(id);
+      if (json) {
+        try {
+          cards.push(JSON.parse(json) as LocalCharacter);
+        } catch {
+          /* 损坏卡跳过 */
+        }
+      }
+    }
+    // 3. 合并覆盖本地(角色卡 + 非角色数据)
+    await replaceAll({ ...small, characters: cards });
+    // 4. 重置同步状态(本地=云端,丢弃待删、重置基线)
+    await characters.drainDeletedCardIds();
+    lastSync.value = Date.now();
+    await kvPut(KV_LAST_SYNC, lastSync.value);
+    message.value = `已恢复 ${cards.length} 角色 / ${small.chats?.length ?? 0} 对话 / ${small.worldinfo?.length ?? 0} 世界书条目。刷新页面生效。`;
   } catch (e) {
     message.value = '恢复失败:' + (e instanceof Error ? e.message : String(e));
   } finally {
@@ -107,8 +145,8 @@ function fmt(ts: number | null): string {
     <p v-if="message" class="tavern-sync__msg">{{ message }}</p>
 
     <p class="tavern-sync__hint">
-      同步会把本地角色卡 / 对话 / 世界书 / 预设打包上传到后端 KV 存储,以用户 ID 为分区键。
-      恢复时本地数据被云端覆盖。建议定期「同步到云端」并搭配设置面板的「导出 JSON 备份」双保险。
+      角色卡按卡粒度增量同步(仅上传变更/删除的卡,省流量与写入额度),对话/世界书/预设批量上传,以用户 ID 分区。
+      恢复时从云端全量拉取覆盖本地。建议定期同步并搭配「导出 JSON 备份」双保险。
     </p>
   </div>
 </template>

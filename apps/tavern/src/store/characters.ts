@@ -11,7 +11,7 @@ import { ref, computed } from 'vue';
 import type { CharacterCard } from '@minist/core';
 import type { AssetRef } from '@minist/shared';
 import { parseCardFile } from '@minist/core';
-import { STORES, del, getAll, put } from '../db/idb';
+import { STORES, del, getAll, put, kvGet, kvPut } from '../db/idb';
 import { useConfigStore } from './config';
 import { getAdapter } from '../adapters';
 
@@ -27,6 +27,8 @@ export interface LocalCharacter {
   imageRef?: AssetRef;
   /** 创建时间。 */
   createdAt: number;
+  /** 最后更新时间(ms),Phase S3 增量同步判定依据(> lastSyncAt 即需上传)。 */
+  updatedAt: number;
   /** 来源版本(v1/v2/v3),用于 UI 提示。 */
   spec: 'v1' | 'v2' | 'v3';
 }
@@ -51,12 +53,20 @@ export const useCharactersStore = defineStore('characters', () => {
   const importing = ref(false);
   const importMessage = ref<string>('');
 
+  /** 本地已删、待同步到云端的卡 id(Phase S3 增量同步的删除传播)。 */
+  const KV_DELETED_CARDS = 'deletedCardIds';
+  const deletedCardIds = ref<string[]>([]);
+
   const current = computed<LocalCharacter | null>(
     () => list.value.find((c) => c.id === currentId.value) ?? null,
   );
 
   async function load(): Promise<void> {
-    list.value = await getAll<LocalCharacter>(STORES.characters);
+    // 旧记录可能无 updatedAt(S3 新增字段),用 createdAt 兜底
+    list.value = (await getAll<LocalCharacter>(STORES.characters)).map((c) =>
+      c.updatedAt ? c : { ...c, updatedAt: c.createdAt },
+    );
+    deletedCardIds.value = (await kvGet<string[]>(KV_DELETED_CARDS)) ?? [];
     // 恢复上次选中
     const saved = localStorage.getItem(STORAGE_CURRENT);
     if (saved && list.value.some((c) => c.id === saved)) {
@@ -84,6 +94,7 @@ export const useCharactersStore = defineStore('characters', () => {
       image,
       imageRef,
       createdAt: Date.now(),
+      updatedAt: Date.now(),
       spec,
     };
     await put(STORES.characters, rec);
@@ -95,14 +106,25 @@ export const useCharactersStore = defineStore('characters', () => {
   async function update(id: string, card: CharacterCard): Promise<void> {
     const idx = list.value.findIndex((c) => c.id === id);
     if (idx < 0) return;
-    const updated: LocalCharacter = { ...list.value[idx], card };
+    const updated: LocalCharacter = { ...list.value[idx], card, updatedAt: Date.now() };
     await put(STORES.characters, updated);
     list.value = list.value.map((c) => (c.id === id ? updated : c));
+  }
+
+  /** 取出并清空待删除清单(syncUp 推送到云端后调用)。 */
+  async function drainDeletedCardIds(): Promise<string[]> {
+    const out = [...deletedCardIds.value];
+    deletedCardIds.value = [];
+    await kvPut(KV_DELETED_CARDS, []);
+    return out;
   }
 
   async function remove(id: string): Promise<void> {
     await del(STORES.characters, id);
     list.value = list.value.filter((c) => c.id !== id);
+    // 记入待同步删除清单,下次 syncUp 推送到云端
+    deletedCardIds.value = [...deletedCardIds.value, id];
+    await kvPut(KV_DELETED_CARDS, deletedCardIds.value);
     if (currentId.value === id) {
       currentId.value = list.value[0]?.id ?? null;
       if (currentId.value) localStorage.setItem(STORAGE_CURRENT, currentId.value);
@@ -166,11 +188,13 @@ export const useCharactersStore = defineStore('characters', () => {
     current,
     importing,
     importMessage,
+    deletedCardIds,
     load,
     select,
     add,
     update,
     remove,
     importFiles,
+    drainDeletedCardIds,
   };
 });

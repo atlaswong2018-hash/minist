@@ -71,6 +71,15 @@ export interface BackendAdapter {
   /** 下载二进制资源为 Blob。 */
   downloadAsset(ref: AssetRef): Promise<Blob>;
 
+  /** 列出云端角色卡 id(Phase S3 粒度同步)。 */
+  listCards(): Promise<string[]>;
+  /** 取单卡(原始 JSON 字符串;不存在返回 null)。 */
+  getCard(id: string): Promise<string | null>;
+  /** upsert 单卡(body=卡片 JSON 字符串)。 */
+  putCard(id: string, json: string): Promise<void>;
+  /** 删单卡(不存在视为成功)。 */
+  deleteCard(id: string): Promise<void>;
+
   /** 上传全量同步负载到云端。 */
   sync(payload: SyncPayload): Promise<void>;
 
