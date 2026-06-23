@@ -43,6 +43,18 @@ export async function handleR2(request: Request, env: Env): Promise<Response> {
     return jsonCors(err('missing key in path', 'BAD_REQUEST'), 400);
   }
 
+  // HEAD(元数据探测,无 body;Phase S4 dedup-on-upload,无需鉴权,裸 HEAD 免预检)。
+  if (request.method === 'HEAD') {
+    const obj = await env.SillyR2.head(key);
+    if (obj === null) return withCors(new Response(null, { status: 404 }));
+    const headers = new Headers();
+    obj.writeHttpMetadata(headers);
+    headers.set('Content-Type', headers.get('Content-Type') ?? guessContentType(key));
+    headers.set('Content-Length', String(obj.size));
+    headers.set('etag', obj.httpEtag);
+    return withCors(new Response(null, { status: 200, headers }));
+  }
+
   // 读取。
   if (request.method === 'GET') {
     const object = await env.SillyR2.get(key);

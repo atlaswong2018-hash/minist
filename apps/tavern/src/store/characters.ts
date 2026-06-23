@@ -57,6 +57,9 @@ export const useCharactersStore = defineStore('characters', () => {
   const KV_DELETED_CARDS = 'deletedCardIds';
   const deletedCardIds = ref<string[]>([]);
 
+  /** 当前上传进度(0..1,null=空闲),Phase S5 大图上传显示。 */
+  const importProgress = ref<number | null>(null);
+
   const current = computed<LocalCharacter | null>(
     () => list.value.find((c) => c.id === currentId.value) ?? null,
   );
@@ -155,10 +158,14 @@ export const useCharactersStore = defineStore('characters', () => {
             if (adapter.hasObjectStorage) {
               try {
                 const sha = await sha256Hex(imageBytes);
+                importProgress.value = 0;
                 imageRef = await adapter.uploadAsset(imageBytes, {
                   sha256: sha,
                   ext: 'png',
                   contentType: 'image/png',
+                  onProgress: (loaded, total) => {
+                    importProgress.value = total > 0 ? loaded / total : 0;
+                  },
                 });
                 inlineImage = undefined; // 外置成功,丢掉内嵌 base64
               } catch (e) {
@@ -178,6 +185,7 @@ export const useCharactersStore = defineStore('characters', () => {
         fail > 0 ? `成功 ${ok} 个,失败 ${fail} 个` : `成功导入 ${ok} 张人物卡`;
     } finally {
       importing.value = false;
+      importProgress.value = null;
     }
     return ok;
   }
@@ -188,6 +196,7 @@ export const useCharactersStore = defineStore('characters', () => {
     current,
     importing,
     importMessage,
+    importProgress,
     deletedCardIds,
     load,
     select,

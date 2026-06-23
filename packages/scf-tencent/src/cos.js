@@ -101,4 +101,26 @@ function deleteObject(params) {
   });
 }
 
-module.exports = { getCos, putObject, getObject, getObjectUrl, listObjects, deleteObject, BUCKET, REGION };
+/** Promise 包装的 cos.headObject(Phase S4 dedup-on-upload 存在性探测)。 */
+function headObject(params) {
+  const cos = getCos();
+  if (!cos) return Promise.reject(new Error('COS 未配置:缺少 COS_BUCKET 环境变量'));
+  return new Promise((resolve, reject) => {
+    cos.headObject(params, (err, data) => {
+      if (err) reject(err);
+      else resolve(data);
+    });
+  });
+}
+
+module.exports = {
+  getCos,
+  putObject,
+  getObject,
+  getObjectUrl,
+  listObjects,
+  deleteObject,
+  headObject,
+  BUCKET,
+  REGION,
+};

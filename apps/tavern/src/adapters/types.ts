@@ -37,6 +37,8 @@ export interface AssetUploadOpts {
   ext: string;
   /** MIME(默认按 ext 推断)。 */
   contentType?: string;
+  /** 上传进度回调(Phase S5,大文件用)。 */
+  onProgress?: (loaded: number, total: number) => void;
 }
 
 /** 统一后端适配器。 */
@@ -68,8 +70,8 @@ export interface BackendAdapter {
    */
   uploadAsset(bytes: Uint8Array, opts: AssetUploadOpts): Promise<AssetRef>;
 
-  /** 下载二进制资源为 Blob。 */
-  downloadAsset(ref: AssetRef): Promise<Blob>;
+  /** 下载二进制资源为 Blob(可选下载进度回调,Phase S5)。 */
+  downloadAsset(ref: AssetRef, onProgress?: (loaded: number, total: number) => void): Promise<Blob>;
 
   /** 列出云端角色卡 id(Phase S3 粒度同步)。 */
   listCards(): Promise<string[]>;

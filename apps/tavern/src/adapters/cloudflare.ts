@@ -23,6 +23,7 @@ import type { BackendAdapter, AdapterArgs, ChatOptions, ChatStreamHandle, AssetU
 import type { AssetRef } from '@minist/shared';
 import { fetchStream } from './stream';
 import { buildChatPayload } from './payload';
+import { xhrUpload, streamDownload } from './progress';
 
 function joinUrl(base: string, path: string): string {
   return base.replace(/\/$/, '') + path;
@@ -106,30 +107,48 @@ export class CloudflareAdapter implements BackendAdapter {
     if (!resp.ok) throw new Error(`保存人物卡失败 ${resp.status}`);
   }
 
+  /** 资源是否已存在(裸 HEAD,简单请求免预检;Phase S4 内容寻址跨用户共享判定)。 */
+  protected async assetExists(uri: string): Promise<boolean> {
+    try {
+      const head = await fetch(uri, { method: 'HEAD' });
+      return head.ok;
+    } catch {
+      return false;
+    }
+  }
+
   /**
    * 上传二进制资源到 R2(内容寻址 key=cards/<sha256>.<ext>)。
-   * 直接 PUT Worker /api/r2/:key(Worker 侧写 R2,无 egress 费)。
+   * dedup-on-upload:已存在(本/跨用户传过同图)则跳过上传,省带宽。
    */
   async uploadAsset(bytes: Uint8Array, opts: AssetUploadOpts): Promise<AssetRef> {
     const key = `cards/${opts.sha256}.${opts.ext}`;
     const uri = joinUrl(this.base, ROUTES.r2) + '/' + key;
-    const resp = await fetch(uri, {
-      method: 'PUT',
-      headers: {
-        ...this.headers(false),
-        'Content-Type': opts.contentType ?? 'application/octet-stream',
+    if (await this.assetExists(uri)) {
+      return { uri, sha256: opts.sha256, size: bytes.byteLength, ext: opts.ext };
+    }
+    const resp = await xhrUpload(
+      uri,
+      {
+        method: 'PUT',
+        headers: {
+          ...this.headers(false),
+          'Content-Type': opts.contentType ?? 'application/octet-stream',
+        },
+        body: bytes,
       },
-      body: bytes,
-    });
+      opts.onProgress,
+    );
     if (!resp.ok) throw new Error(`资源上传失败 ${resp.status}`);
     return { uri, sha256: opts.sha256, size: bytes.byteLength, ext: opts.ext };
   }
 
-  /** 下载二进制资源(GET Worker /api/r2/:key → Blob)。 */
-  async downloadAsset(ref: AssetRef): Promise<Blob> {
-    const resp = await fetch(ref.uri, { headers: this.headers(false) });
-    if (!resp.ok) throw new Error(`资源下载失败 ${resp.status}`);
-    return resp.blob();
+  /** 下载二进制资源(GET Worker /api/r2/:key → Blob,流式带进度)。 */
+  async downloadAsset(
+    ref: AssetRef,
+    onProgress?: (loaded: number, total: number) => void,
+  ): Promise<Blob> {
+    return streamDownload(ref.uri, this.headers(false), onProgress);
   }
 
   // ── Phase S3:角色卡 per-card 粒度同步(TencentAdapter 继承本实现,SCF 同路径)──

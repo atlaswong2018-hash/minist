@@ -15,7 +15,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const { ROUTES } = require('../constants');
-const { getObjectUrl, BUCKET, REGION } = require('../cos');
+const { getObjectUrl, headObject, BUCKET, REGION } = require('../cos');
 
 const router = express.Router();
 
@@ -65,6 +65,20 @@ router.post(ROUTES.r2 + '/presign', (req, res) => {
     });
   } catch (e) {
     return fail(res, 500, '预签名生成失败: ' + (e && e.message ? e.message : String(e)));
+  }
+});
+
+/** HEAD /api/r2/:key — 对象存在性探测(无 body;Phase S4 dedup-on-upload)。 */
+router.head(ROUTES.r2 + '/*', async (req, res) => {
+  try {
+    if (!BUCKET) return res.status(404).end();
+    const key = req.params[0];
+    if (!key) return res.status(400).end();
+    await headObject({ Bucket: BUCKET, Region: REGION, Key: key });
+    return res.status(200).end();
+  } catch (e) {
+    // 不存在 / 探测失败 → 404,前端将走上传
+    return res.status(404).end();
   }
 });
 

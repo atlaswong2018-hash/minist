@@ -28,7 +28,7 @@ async function onChange(e: Event): Promise<void> {
 <template>
   <div class="tavern-import">
     <button class="tavern-import__btn" :disabled="characters.importing" @click="trigger">
-      {{ characters.importing ? '导入中…' : '+ 导入人物卡(PNG/JSON)' }}
+      {{ characters.importing ? (characters.importProgress != null ? `上传中 ${Math.round(characters.importProgress * 100)}%` : '导入中…') : '+ 导入人物卡(PNG/JSON)' }}
     </button>
     <input
       ref="fileInput"

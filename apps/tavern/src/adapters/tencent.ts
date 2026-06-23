@@ -13,6 +13,7 @@ import type { CharacterCard } from '@minist/core';
 import type { BackendAdapter, AdapterArgs, AssetUploadOpts } from './types';
 import type { AssetRef } from '@minist/shared';
 import { CloudflareAdapter } from './cloudflare';
+import { xhrUpload } from './progress';
 
 interface PresignResult {
   uploadUrl: string;
@@ -43,6 +44,11 @@ export class TencentAdapter extends CloudflareAdapter implements BackendAdapter 
    */
   override async uploadAsset(bytes: Uint8Array, opts: AssetUploadOpts): Promise<AssetRef> {
     const key = `cards/${opts.sha256}.${opts.ext}`;
+    const uri = this.base + ROUTES.r2 + '/' + key;
+    // dedup-on-upload:已存在(本/跨用户传过同图)则跳过 presign+上传,省带宽
+    if (await this.assetExists(uri)) {
+      return { uri, sha256: opts.sha256, size: bytes.byteLength, ext: opts.ext };
+    }
     const contentType = opts.contentType ?? 'application/octet-stream';
     const presignResp = await fetch(this.base + ROUTES.r2 + '/presign', {
       method: 'POST',
@@ -56,18 +62,13 @@ export class TencentAdapter extends CloudflareAdapter implements BackendAdapter 
     }>;
     if (!env.success) throw new Error(env.error || '预签名响应无效');
     if (!env.data) throw new Error('预签名响应无效');
-    const putResp = await fetch(env.data.url, {
-      method: 'PUT',
-      headers: env.data.headers ?? { 'Content-Type': contentType },
-      body: bytes,
-    });
+    const putResp = await xhrUpload(
+      env.data.url,
+      { method: 'PUT', headers: env.data.headers ?? { 'Content-Type': contentType }, body: bytes },
+      opts.onProgress,
+    );
     if (!putResp.ok) throw new Error(`上传资源到 COS 失败 ${putResp.status}`);
-    return {
-      uri: this.base + ROUTES.r2 + '/' + key,
-      sha256: opts.sha256,
-      size: bytes.byteLength,
-      ext: opts.ext,
-    };
+    return { uri, sha256: opts.sha256, size: bytes.byteLength, ext: opts.ext };
   }
 
   /**

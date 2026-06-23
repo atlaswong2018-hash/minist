@@ -95,13 +95,16 @@
 - [x] 前端增量同步:BackendAdapter 加 listCards/getCard/putCard/deleteCard(CF 实现,Tencent 继承,local 抛错);LocalCharacter 加 updatedAt;删除记 deletedCardIds 待传;SyncPanel.syncUp 仅传变更/删除卡,syncDown 粒度拉取
 - [x] 验证:shared/core/worker-cf typecheck + tavern build 全绿;scf 语法 OK(bodyParser 10mb 够内嵌卡);**1000+ 卡 e2e 待用户环境**
 
-### Phase S4 — 同步瘦身 + 跨用户共享
-- [ ] SyncPayload 只含元数据 + 引用清单(无二进制)
-- [ ] 二进制按 sha256 全局共享(跨卡/跨用户同图只存一份)
-- [ ] 同步体稳定在 KB~MB 级
+### Phase S4 — 同步瘦身 + 跨用户共享 ✅
+- [x] SyncPayload 无二进制:S1 已外置图片(卡 JSON 存 imageRef)+ S3 增量同步 → 同步体仅元数据,KV/COS 单对象小
+- [x] 二进制 sha256 全局共享:S1 已用全局 key `cards/<sha256>.<ext>`(无用户前缀),同图跨卡/跨用户幂等覆盖只存一份
+- [x] **dedup-on-upload**(S4 新增):上传前裸 HEAD 探测,已存在则跳过上传,省跨用户重复图带宽。CF `r2.ts` + scf `r2.js` 加 HEAD 路由(R2.head / cos headObject);裸 HEAD 是 CORS 简单请求,免预检
 
-### Phase S5 — 大文件流式(本轮纳入)
-- [ ] 单文件 >阈值(100MB)Range 请求 + 进度条
+### Phase S5 — 大文件传输进度 ✅
+- [x] 上传进度:新增 `progress.ts` `xhrUpload`(XHR upload progress 事件,fetch 无此能力);CF/Tencent uploadAsset 改 XHR 上传;`AssetUploadOpts.onProgress`
+- [x] 下载进度:`streamDownload`(ReadableStream 逐块计数);`downloadAsset(ref, onProgress)`(Tencent 继承)
+- [x] UI:`characters.importProgress`(0..1),CharacterImport 按钮显示「上传中 X%」
+- [~] **Range/断点续传未做**:当前头像场景(≤几 MB)无需;真正 >100MB 单文件(V3 视频/大文档)的 Range 分块/UI 渲染也未落地,留作后续(低 ROI)
 
 ### 约束 / 成本
 - R2 免费档 10GB → 20GB+ 需付费($0.015/GB·月,egress 免费)或走 COS(按量,容量近无限)。

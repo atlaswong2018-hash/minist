@@ -32,7 +32,10 @@ export class LocalAdapter implements BackendAdapter {
     throw new Error('本地直连模式无对象存储,无法外置资源(请切换到 Cloudflare/腾讯云后端)');
   }
 
-  async downloadAsset(_ref: AssetRef): Promise<Blob> {
+  async downloadAsset(
+    _ref: AssetRef,
+    _onProgress?: (loaded: number, total: number) => void,
+  ): Promise<Blob> {
     throw new Error('本地直连模式无对象存储');
   }
 

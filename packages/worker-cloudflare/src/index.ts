@@ -75,7 +75,7 @@ async function route(request: Request, env: Env): Promise<Response> {
   // ─── R2 图片:/api/r2/:key ────────────────────────────────────────
   if (
     path.startsWith(ROUTES.r2 + '/') &&
-    (method === 'GET' || method === 'PUT' || method === 'DELETE')
+    (method === 'GET' || method === 'PUT' || method === 'DELETE' || method === 'HEAD')
   ) {
     return handleR2(request, env);
   }
