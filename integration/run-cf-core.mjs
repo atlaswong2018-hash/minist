@@ -98,10 +98,13 @@ try {
   const down = await fetchJson(`${base}/api/sync/u-cf-test`);
   const d = down.json?.data;
   if (!d) fail(TAG, `sync 拉取无数据: ${down.text}`);
-  if (JSON.stringify(d.characters) !== JSON.stringify(payload.characters)) fail(TAG, `characters 还原不符: ${JSON.stringify(d.characters)}`);
+  // S3 起 characters 走粒度路由(/api/sync/card/*),/api/sync 不再返回 characters
+  if (JSON.stringify(d.characters) !== '[]') fail(TAG, `characters 应为 [](S3 起走粒度路由,见 run-storage): ${JSON.stringify(d.characters)}`);
   if (d.chats.length !== 2 || d.chats[0].content !== '你好' || d.chats[1].content !== '嗨')
     fail(TAG, `chats(D1)还原不符: ${JSON.stringify(d.chats)}`);
-  pass(TAG, '全量同步往返正确(characters→KV,chats→D1,组装还原一致)');
+  if (d.worldinfo.length !== 1 || d.worldinfo[0].content !== 'w1')
+    fail(TAG, `worldinfo 还原不符: ${JSON.stringify(d.worldinfo)}`);
+  pass(TAG, '全量同步往返正确(chats→D1,worldinfo/presets→KV;characters 自 S3 起走粒度路由)');
   results.push(true);
 
   // ③ 流式中转

@@ -17,7 +17,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const WORKER_DIR = path.join(ROOT, 'packages', 'worker-cloudflare');
 const PORT = 8787;
 const base = `http://127.0.0.1:${PORT}`;
-const UID = 'e2e-uid';
+const UID = 'e2e-' + Math.random().toString(36).slice(2, 10);
 
 const wrangler = spawnLong('npx', [
   'wrangler', 'dev', '-c', 'wrangler.test.toml', '--local',
