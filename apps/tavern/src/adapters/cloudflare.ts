@@ -19,7 +19,8 @@ import {
   type TavernConfig,
 } from '@minist/shared';
 import type { CharacterCard } from '@minist/core';
-import type { BackendAdapter, AdapterArgs, ChatOptions, ChatStreamHandle } from './types';
+import type { BackendAdapter, AdapterArgs, ChatOptions, ChatStreamHandle, AssetUploadOpts } from './types';
+import type { AssetRef } from '@minist/shared';
 import { fetchStream } from './stream';
 import { buildChatPayload } from './payload';
 
@@ -36,6 +37,7 @@ function unwrapOrThrow<T>(env: ApiEnvelope<T>): T {
 export class CloudflareAdapter implements BackendAdapter {
   readonly name: string = 'Cloudflare Worker';
   readonly backend: TavernConfig['backend'] = 'cloudflare';
+  readonly hasObjectStorage = true;
   protected cfg: TavernConfig;
 
   constructor(args: AdapterArgs) {
@@ -102,6 +104,32 @@ export class CloudflareAdapter implements BackendAdapter {
       body,
     });
     if (!resp.ok) throw new Error(`保存人物卡失败 ${resp.status}`);
+  }
+
+  /**
+   * 上传二进制资源到 R2(内容寻址 key=cards/<sha256>.<ext>)。
+   * 直接 PUT Worker /api/r2/:key(Worker 侧写 R2,无 egress 费)。
+   */
+  async uploadAsset(bytes: Uint8Array, opts: AssetUploadOpts): Promise<AssetRef> {
+    const key = `cards/${opts.sha256}.${opts.ext}`;
+    const uri = joinUrl(this.base, ROUTES.r2) + '/' + key;
+    const resp = await fetch(uri, {
+      method: 'PUT',
+      headers: {
+        ...this.headers(false),
+        'Content-Type': opts.contentType ?? 'application/octet-stream',
+      },
+      body: bytes,
+    });
+    if (!resp.ok) throw new Error(`资源上传失败 ${resp.status}`);
+    return { uri, sha256: opts.sha256, size: bytes.byteLength, ext: opts.ext };
+  }
+
+  /** 下载二进制资源(GET Worker /api/r2/:key → Blob)。 */
+  async downloadAsset(ref: AssetRef): Promise<Blob> {
+    const resp = await fetch(ref.uri, { headers: this.headers(false) });
+    if (!resp.ok) throw new Error(`资源下载失败 ${resp.status}`);
+    return resp.blob();
   }
 
   async sync(payload: SyncPayload): Promise<void> {

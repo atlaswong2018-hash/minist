@@ -56,3 +56,54 @@
 
 ### 后续路线
 精确 tokenizer / 人物卡可视化编辑器 / 完整组队聊天 / 向量检索 AI 助手 / EdgeOne 方案 / 真实云凭证联调与 e2e 测试。
+
+---
+
+## 分层存储(大容量角色库 · 全库 20GB+)
+
+> 起因:用户**全库**(角色卡 + 世界书 + 聊天)总量可达 20GB+,远超 IndexedDB 配额(几 GB·可回收)与 CF KV 单值(25MB)。腾讯云 sync 现为「整包单 COS 对象」(`minist_users/<uid>.json`),全库也会变单个巨型对象。
+> 范式转变:**云对象存储(R2/COS)= 数据主存;IndexedDB = 有上限 LRU 缓存;KV/COS 元数据 = 轻量 JSON(无内嵌二进制)**。
+> 双后端**各自实现**(CF:R2+KV+D1 / Tencent:COS),前端按 backend 路由,**不抽象统一**(用户答:「不同方案、各自存储」)。
+>
+> **已锁定参数**(用户确认):
+> - 图片内嵌阈值 = **1MB**(≤1MB 内嵌离线可用,>1MB 外置到对象存储)
+> - 双后端 **R2 + COS 同步实现、并重**(不分主次)
+> - IndexedDB 缓存 = **动态预算**(`navigator.storage.estimate()` 可用额 ~30%,或按 `deviceMemory`:移动 ~300M / 桌面 ~1-2G)
+> - **S5 大文件流式本轮纳入**(不推后)
+> - 外置仅在 `backend = cloudflare/tencent` 可用;`local` 无对象存储,图片只能内嵌(受 IndexedDB 配额约束)。
+
+### Phase S1 — 卡图片外置 + 内容寻址(基础,最大收益)✅
+- [x] shared/types:新增 `AssetRef` 类型(imageRef 落在 `LocalCharacter` 而非 card spec,更贴合现有数据模型)
+- [x] core:parseCardFile 解析后保留 image 原始 bytes(`ParseCardResult.imageBytes`)
+- [x] tavern/store/characters.importFiles:image 字节数 >阈值(**1MB**)→ 上传对象存储(key=`cards/<sha256>.<ext>`)→ 卡存 imageRef、删内嵌 base64;≤1MB 仍内嵌;外置失败回退内嵌
+- [x] tavern/composables/useAsset(新):按 imageRef 懒加载(会话 urlCache → IndexedDB 缓存 → 回源 GET)
+- [x] tavern/components:新增 CharacterAvatar.vue,CharacterCard/CharacterList 头像统一走它(内嵌优先,回退外置懒加载)
+- [x] CF `r2.ts`:**零改动**(已支持任意 key 的 PUT/GET/DELETE + CORS);CloudflareAdapter.uploadAsset/downloadAsset
+- [x] Tencent:scf `r2.js` 新增 GET 下载路由(镜像 CF);TencentAdapter.uploadAsset(presign 直传 COS),downloadAsset 继承 CF
+- [x] 验证:shared/core typecheck + tavern vue-tsc+vite build 全绿(95 模块);r2.js 语法 OK。**导入大图真机 e2e 待用户环境**(沙箱无浏览器/真实 R2/COS 凭证)
+
+### Phase S2 — IndexedDB 缓存治理(防 20GB 崩浏览器)✅
+- [x] idb.ts:assets store 已于 S1 建立;**动态预算** `getAssetBudget()`(storage.estimate ~30% / deviceMemory 分档 / 兜底 500MB,上下界 100MB~2GB)+ `enforceAssetBudget()` LRU 淘汰
+- [x] useAsset:命中 touch lastUsed(getAsset 异步 touch);超预算按 lastUsed 升序淘汰最旧,被淘汰资源 revoke blob URL
+- [x] 冷卡仅元数据常驻,二进制按需拉取缓存(S1 useAsset 已实现)
+- [x] 验证:typecheck + build 全绿;**超量淘汰真机 e2e 待用户环境**
+
+### Phase S3 — 元数据分片(全库膨胀,单对象超限)
+- [ ] CF sync.ts:characters/worldinfo 从单值改为 per-card(`sync:uid:char:<id>`)+ 索引(`sync:uid:char-index`)
+- [ ] CF sync:增量同步(仅变更卡),省 1000 写/天额度;前端按需拉单卡
+- [ ] Tencent sync.js:从单 blob 改为 per-card 对象(`minist_users/<uid>/cards/<id>.json`)+ 索引对象
+- [ ] SyncPayload 拆为「索引清单」;前端按需拉单卡元数据
+- [ ] 验证:模拟 1000+ 卡,各 KV/COS 单对象 <25MB;增量同步只写变更
+
+### Phase S4 — 同步瘦身 + 跨用户共享
+- [ ] SyncPayload 只含元数据 + 引用清单(无二进制)
+- [ ] 二进制按 sha256 全局共享(跨卡/跨用户同图只存一份)
+- [ ] 同步体稳定在 KB~MB 级
+
+### Phase S5 — 大文件流式(本轮纳入)
+- [ ] 单文件 >阈值(100MB)Range 请求 + 进度条
+
+### 约束 / 成本
+- R2 免费档 10GB → 20GB+ 需付费($0.015/GB·月,egress 免费)或走 COS(按量,容量近无限)。
+- 内容寻址(sha256)天然去重,省存储 + 省元数据写。
+- 二进制走 HTTPS;免备案混淆对大文件不现实(图片本身不敏感),接受明文或后续分块加密。

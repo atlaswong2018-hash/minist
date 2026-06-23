@@ -19,6 +19,8 @@ export interface ParseCardResult {
   spec: 'v1' | 'v2' | 'v3';
   /** 图片 dataURL(PNG 来源时携带,便于前端直接显示头像;JSON 来源时为 undefined)。 */
   image?: string;
+  /** PNG 原始字节(PNG 来源时携带,供前端按需上传到对象存储外置;JSON 来源时为 undefined)。 */
+  imageBytes?: Uint8Array;
 }
 
 /** PNG 签名前 8 字节,用于类型嗅探(不依赖文件扩展名)。 */
@@ -71,7 +73,7 @@ function parseBytes(buf: Uint8Array, mimeHint: string): ParseCardResult {
     // PNG 来源:构造 dataURL 作为头像(PNG 原图)
     const image = dataUrlFromPng(buf);
     // spec 优先用 PNG chunk keyword 的粗判,但最终以 JSON 内 spec 字段为准(normSpec)
-    return { card, spec: normSpec, image };
+    return { card, spec: normSpec, image, imageBytes: buf };
   }
 
   // 按 JSON 处理

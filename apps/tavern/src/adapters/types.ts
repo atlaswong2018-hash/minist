@@ -6,7 +6,7 @@
  *
  * chat() 返回一个支持中断的流式句柄:stream 是 async generator,abort 可中断。
  */
-import type { ChatMessage, SyncPayload, TavernConfig } from '@minist/shared';
+import type { AssetRef, ChatMessage, SyncPayload, TavernConfig } from '@minist/shared';
 import type { CharacterCard } from '@minist/core';
 
 /** chat() 调用选项。 */
@@ -29,12 +29,24 @@ export interface ChatStreamHandle {
   aborted: () => boolean;
 }
 
+/** uploadAsset 调用选项。 */
+export interface AssetUploadOpts {
+  /** 内容寻址 sha256(已由调用方算好)。 */
+  sha256: string;
+  /** 扩展名(无点),如 `png`。 */
+  ext: string;
+  /** MIME(默认按 ext 推断)。 */
+  contentType?: string;
+}
+
 /** 统一后端适配器。 */
 export interface BackendAdapter {
   /** 适配器名(展示用)。 */
   readonly name: string;
   /** 后端模式。 */
   readonly backend: TavernConfig['backend'];
+  /** 该后端是否有对象存储(local/direct 无,cloudflare/tencent 有)。 */
+  readonly hasObjectStorage: boolean;
 
   /** 健康检查(后端可达返回 true)。 */
   health(): Promise<boolean>;
@@ -49,6 +61,15 @@ export interface BackendAdapter {
 
   /** 保存人物卡到云端(后端为 local/direct 时为 no-op)。 */
   saveCard(card: CharacterCard): Promise<void>;
+
+  /**
+   * 上传二进制资源(头像/图片)到对象存储,内容寻址,返回引用。
+   * 仅 cloudflare/tencent 实现;local/direct 无对象存储,调用方应先查 hasObjectStorage。
+   */
+  uploadAsset(bytes: Uint8Array, opts: AssetUploadOpts): Promise<AssetRef>;
+
+  /** 下载二进制资源为 Blob。 */
+  downloadAsset(ref: AssetRef): Promise<Blob>;
 
   /** 上传全量同步负载到云端。 */
   sync(payload: SyncPayload): Promise<void>;

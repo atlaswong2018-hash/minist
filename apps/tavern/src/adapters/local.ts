@@ -8,15 +8,16 @@
  * saveCard/sync/pull 在本地模式下走 IndexedDB(由 store 层负责),
  * 此适配器对这些方法为 no-op / 返回空,避免重复持久化。
  */
-import type { BackendAdapter, AdapterArgs, ChatOptions, ChatStreamHandle } from './types';
+import type { BackendAdapter, AdapterArgs, ChatOptions, ChatStreamHandle, AssetUploadOpts } from './types';
 import { fetchStream } from './stream';
 import { buildChatPayload, normalizeChatUrl } from './payload';
-import type { ChatMessage, SyncPayload } from '@minist/shared';
+import type { AssetRef, ChatMessage, SyncPayload } from '@minist/shared';
 import type { CharacterCard } from '@minist/core';
 
 export class LocalAdapter implements BackendAdapter {
   readonly name = '本地 / 直连';
   readonly backend = 'local' as const;
+  readonly hasObjectStorage = false;
   protected cfg: AdapterArgs['config'];
 
   constructor(args: AdapterArgs) {
@@ -25,6 +26,14 @@ export class LocalAdapter implements BackendAdapter {
 
   async health(): Promise<boolean> {
     return true; // direct/local 不依赖后端
+  }
+
+  async uploadAsset(_bytes: Uint8Array, _opts: AssetUploadOpts): Promise<AssetRef> {
+    throw new Error('本地直连模式无对象存储,无法外置资源(请切换到 Cloudflare/腾讯云后端)');
+  }
+
+  async downloadAsset(_ref: AssetRef): Promise<Blob> {
+    throw new Error('本地直连模式无对象存储');
   }
 
   async chat(messages: ChatMessage[], opts: ChatOptions = {}): Promise<ChatStreamHandle> {

@@ -23,6 +23,24 @@ export interface ChatMessage {
   timestamp?: number;
 }
 
+/**
+ * 二进制资源(角色卡头像/图片等)的对象存储引用。
+ *
+ * 大资源不内嵌 base64 进卡片 JSON(会撑爆 KV 25MB / IndexedDB 配额),
+ * 而是上传到对象存储(R2/COS),卡里只存本引用。
+ * sha256 内容寻址:跨卡/跨用户同图只存一份,天然去重。
+ */
+export interface AssetRef {
+  /** 可直接 GET 的 URI(`<apiBaseUrl>/api/r2/cards/<sha256>.<ext>`)。 */
+  uri: string;
+  /** 内容寻址 sha256(对象 key 的一部分,去重/缓存键)。 */
+  sha256: string;
+  /** 字节大小。 */
+  size: number;
+  /** 扩展名(无点),如 `png`。 */
+  ext: string;
+}
+
 /** 酒馆核心配置。前端设置面板编辑,持久化在 IndexedDB。 */
 export interface TavernConfig {
   /** 后端模式。 */

@@ -68,4 +68,40 @@ router.post(ROUTES.r2 + '/presign', (req, res) => {
   }
 });
 
+/** 根据 key 后缀推断 Content-Type。 */
+function guessContentType(key) {
+  const lower = String(key || '').toLowerCase();
+  if (lower.endsWith('.png')) return 'image/png';
+  if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+  if (lower.endsWith('.gif')) return 'image/gif';
+  if (lower.endsWith('.webp')) return 'image/webp';
+  if (lower.endsWith('.json')) return 'application/json; charset=utf-8';
+  return 'application/octet-stream';
+}
+
+/**
+ * GET /api/r2/:key — 下载对象(COS getObject → 回写)。
+ * 镜像 CF r2.ts GET,供前端 downloadAsset 取回内容寻址资源(如 cards/<sha256>.png)。
+ * 通配 * 捕获 /api/r2/ 之后全部(express 4,req.params[0],含斜杠)。
+ * 注:S1 头像场景对象较小,整 buf 回写可接受;超大文件流式见 Phase S5。
+ */
+router.get(ROUTES.r2 + '/*', async (req, res) => {
+  try {
+    if (!BUCKET) return fail(res, 500, 'COS 未配置:缺少 COS_BUCKET');
+    const key = req.params[0];
+    if (!key) return fail(res, 400, 'missing key');
+    const data = await getObject({ Bucket: BUCKET, Region: REGION, Key: key });
+    const buf = data.Body;
+    const ct =
+      (data.headers && (data.headers['content-type'] || data.headers['Content-Type'])) ||
+      guessContentType(key);
+    res.setHeader('Content-Type', ct);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.send(Buffer.isBuffer(buf) ? buf : Buffer.from(buf || ''));
+  } catch (e) {
+    // getObject 失败(对象不存在 / 权限)统一 404
+    return fail(res, 404, '对象不存在或读取失败');
+  }
+});
+
 module.exports = router;

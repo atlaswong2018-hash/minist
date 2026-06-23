@@ -9,8 +9,11 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import type { CharacterCard } from '@minist/core';
+import type { AssetRef } from '@minist/shared';
 import { parseCardFile } from '@minist/core';
 import { STORES, del, getAll, put } from '../db/idb';
+import { useConfigStore } from './config';
+import { getAdapter } from '../adapters';
 
 /** 本地存储的人物卡记录(包装规范化卡片 + 头像)。 */
 export interface LocalCharacter {
@@ -18,12 +21,25 @@ export interface LocalCharacter {
   id: string;
   /** 规范化后的人物卡(V2/V3)。 */
   card: CharacterCard;
-  /** 头像 dataURL(PNG 来源);无图时 undefined。 */
+  /** 头像 dataURL(PNG 来源,≤1MB 内嵌);无图时 undefined。 */
   image?: string;
+  /** 外置头像引用(image 为空且本字段存在时,头像走对象存储懒加载)。 */
+  imageRef?: AssetRef;
   /** 创建时间。 */
   createdAt: number;
   /** 来源版本(v1/v2/v3),用于 UI 提示。 */
   spec: 'v1' | 'v2' | 'v3';
+}
+
+/** 图片内嵌阈值:≤ 此值内嵌 dataURL(离线可用);> 此值外置对象存储。 */
+const INLINE_IMAGE_THRESHOLD = 1 * 1024 * 1024; // 1MB
+
+/** 计算 Uint8Array 的 sha256(hex),内容寻址用。需 secure context(https/localhost)。 */
+async function sha256Hex(bytes: Uint8Array): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 /** 当前选中角色的 id(本地持久化可选,这里仅内存)。 */
@@ -55,12 +71,18 @@ export const useCharactersStore = defineStore('characters', () => {
     localStorage.setItem(STORAGE_CURRENT, id);
   }
 
-  async function add(card: CharacterCard, image?: string, spec: 'v1' | 'v2' | 'v3' = 'v2'): Promise<LocalCharacter> {
+  async function add(
+    card: CharacterCard,
+    image?: string,
+    spec: 'v1' | 'v2' | 'v3' = 'v2',
+    imageRef?: AssetRef,
+  ): Promise<LocalCharacter> {
     const name = card.data?.name || '未命名角色';
     const rec: LocalCharacter = {
       id: `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
       card,
       image,
+      imageRef,
       createdAt: Date.now(),
       spec,
     };
@@ -98,11 +120,32 @@ export const useCharactersStore = defineStore('characters', () => {
     importMessage.value = '';
     let ok = 0;
     let fail = 0;
+    const config = useConfigStore();
     try {
       for (const file of files) {
         try {
-          const { card, spec, image } = await parseCardFile(file);
-          await add(card, image, spec);
+          const { card, spec, image, imageBytes } = await parseCardFile(file);
+          let inlineImage = image;
+          let imageRef: AssetRef | undefined;
+          // 大图(>1MB)且后端有对象存储 → 外置,卡 JSON 不再内嵌 base64
+          if (imageBytes && imageBytes.byteLength > INLINE_IMAGE_THRESHOLD) {
+            const adapter = getAdapter(config.config);
+            if (adapter.hasObjectStorage) {
+              try {
+                const sha = await sha256Hex(imageBytes);
+                imageRef = await adapter.uploadAsset(imageBytes, {
+                  sha256: sha,
+                  ext: 'png',
+                  contentType: 'image/png',
+                });
+                inlineImage = undefined; // 外置成功,丢掉内嵌 base64
+              } catch (e) {
+                // 外置失败(网络/后端未配)→ 回退内嵌,保证可用
+                console.warn('[minist] 资源外置失败,回退内嵌:', e);
+              }
+            }
+          }
+          await add(card, inlineImage, spec, imageRef);
           ok++;
         } catch (e) {
           fail++;

@@ -3,6 +3,7 @@
  * CharacterList.vue — 角色列表 / 切换 / 删除。
  */
 import { useCharactersStore } from '../store/characters';
+import CharacterAvatar from './CharacterAvatar.vue';
 
 const characters = useCharactersStore();
 
@@ -29,8 +30,7 @@ async function remove(id: string, name: string): Promise<void> {
     >
       <button class="tavern-charlist__main" @click="select(c.id)">
         <div class="tavern-charlist__avatar">
-          <img v-if="c.image" :src="c.image" :alt="c.card.data?.name" />
-          <span v-else>{{ (c.card.data?.name || '?').charAt(0) }}</span>
+          <CharacterAvatar :character="c" />
         </div>
         <div class="tavern-charlist__info">
           <div class="tavern-charlist__name">{{ c.card.data?.name || '未命名' }}</div>

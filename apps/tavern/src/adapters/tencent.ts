@@ -10,7 +10,8 @@
  */
 import { ROUTES, type ApiEnvelope } from '@minist/shared';
 import type { CharacterCard } from '@minist/core';
-import type { BackendAdapter, AdapterArgs } from './types';
+import type { BackendAdapter, AdapterArgs, AssetUploadOpts } from './types';
+import type { AssetRef } from '@minist/shared';
 import { CloudflareAdapter } from './cloudflare';
 
 interface PresignResult {
@@ -33,6 +34,40 @@ export class TencentAdapter extends CloudflareAdapter implements BackendAdapter 
     } catch {
       return false;
     }
+  }
+
+  /**
+   * 上传二进制资源到 COS(内容寻址 key=cards/<sha256>.<ext>)。
+   * 腾讯云方案:先 POST /api/r2/presign 拿预签名 URL,再 PUT 直传 COS(不经 SCF,省流量配额)。
+   * downloadAsset 直接继承 CloudflareAdapter(GET ref.uri → Blob,SCF 的 GET /api/r2/* 路由回源)。
+   */
+  override async uploadAsset(bytes: Uint8Array, opts: AssetUploadOpts): Promise<AssetRef> {
+    const key = `cards/${opts.sha256}.${opts.ext}`;
+    const contentType = opts.contentType ?? 'application/octet-stream';
+    const presignResp = await fetch(this.base + ROUTES.r2 + '/presign', {
+      method: 'POST',
+      headers: { ...this.headers(false), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, contentType }),
+    });
+    if (!presignResp.ok) throw new Error(`获取上传预签名失败 ${presignResp.status}`);
+    const env = (await presignResp.json().catch(() => ({ success: false, error: 'parse' }))) as ApiEnvelope<{
+      url: string;
+      headers?: Record<string, string>;
+    }>;
+    if (!env.success) throw new Error(env.error || '预签名响应无效');
+    if (!env.data) throw new Error('预签名响应无效');
+    const putResp = await fetch(env.data.url, {
+      method: 'PUT',
+      headers: env.data.headers ?? { 'Content-Type': contentType },
+      body: bytes,
+    });
+    if (!putResp.ok) throw new Error(`上传资源到 COS 失败 ${putResp.status}`);
+    return {
+      uri: this.base + ROUTES.r2 + '/' + key,
+      sha256: opts.sha256,
+      size: bytes.byteLength,
+      ext: opts.ext,
+    };
   }
 
   /**

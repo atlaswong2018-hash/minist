@@ -4,6 +4,7 @@
  */
 import { computed } from 'vue';
 import { useCharactersStore } from '../store/characters';
+import CharacterAvatar from './CharacterAvatar.vue';
 
 const characters = useCharactersStore();
 const card = computed(() => characters.current?.card);
@@ -13,16 +14,12 @@ const desc = computed(() => {
   if (!d) return '';
   return d.length > 40 ? d.slice(0, 40) + '…' : d;
 });
-const image = computed(() => characters.current?.image);
 </script>
 
 <template>
   <div class="tavern-charchard">
-    <div v-if="image" class="tavern-charchard__avatar">
-      <img :src="image" :alt="name" />
-    </div>
-    <div v-else class="tavern-charchard__avatar tavern-charchard__avatar--placeholder">
-      {{ name.charAt(0) || '?' }}
+    <div class="tavern-charchard__avatar">
+      <CharacterAvatar :character="characters.current" />
     </div>
     <div class="tavern-charchard__meta">
       <div class="tavern-charchard__name">{{ name }}</div>

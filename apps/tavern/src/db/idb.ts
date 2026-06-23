@@ -15,7 +15,7 @@ import type { SyncPayload, TavernConfig } from '@minist/shared';
 import { SYNC_VERSION } from '@minist/shared';
 
 const DB_NAME = 'minist-tavern';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 /** store 名常量,供各 store 引用。 */
 export const STORES = {
@@ -24,6 +24,8 @@ export const STORES = {
   worldinfo: 'worldinfo',
   presets: 'presets',
   kv: 'kv',
+  /** 外置资源的本地缓存(key=sha256,内容寻址)。Phase S2 加体积预算/LRU。 */
+  assets: 'assets',
 } as const;
 
 /** kv store 中存 config 的固定 key。 */
@@ -52,6 +54,10 @@ function getDB(): Promise<IDBPDatabase> {
       }
       if (!db.objectStoreNames.contains(STORES.kv)) {
         db.createObjectStore(STORES.kv);
+      }
+      if (!db.objectStoreNames.contains(STORES.assets)) {
+        // v2 新增:外置资源本地缓存,以 sha256 为 key(内容寻址,跨卡去重)
+        db.createObjectStore(STORES.assets, { keyPath: 'sha256' });
       }
     },
   }).catch((e) => {
@@ -117,6 +123,88 @@ export async function kvDel(key: string): Promise<void> {
   await del(STORES.kv, key);
 }
 
+// ── 外置资源缓存(sha256 内容寻址)──────────────────────────────────────
+
+/** 资源缓存记录。Blob 由 IndexedDB 结构化克隆直接持久化。 */
+export interface AssetCacheRecord {
+  sha256: string;
+  blob: Blob;
+  size: number;
+  /** 最近使用时间(ms),LRU 淘汰依据。 */
+  lastUsed: number;
+}
+
+/** 取缓存的资源 Blob(未缓存返回 undefined)。命中时顺带 touch lastUsed(LRU),fire-and-forget。 */
+export async function getAsset(sha256: string): Promise<Blob | undefined> {
+  const rec = await get<AssetCacheRecord>(STORES.assets, sha256);
+  if (!rec) return undefined;
+  // 仅在 urlCache miss 时命中此路径,频率低;异步 touch 不阻塞读
+  void put(STORES.assets, { ...rec, lastUsed: Date.now() } as AssetCacheRecord);
+  return rec.blob;
+}
+
+/** 写入资源缓存,并按预算 LRU 淘汰;返回被淘汰的 sha256 列表(供调用方 revoke blob URL)。 */
+export async function putAsset(asset: {
+  sha256: string;
+  blob: Blob;
+  size: number;
+}): Promise<string[]> {
+  await put(STORES.assets, { ...asset, lastUsed: Date.now() } as AssetCacheRecord);
+  return enforceAssetBudget(await getAssetBudget());
+}
+
+/** 默认资源缓存预算(估算失败兜底)。 */
+const DEFAULT_ASSET_BUDGET = 500 * 1024 * 1024; // 500MB
+let budgetCache: number | null = null;
+
+/**
+ * 动态资源缓存预算(Phase S2):
+ *  优先 navigator.storage.estimate() 可用配额的 ~30%;
+ *  失败则按 navigator.deviceMemory 分档(≤4GB→300MB,否则→1GB);
+ *  最终兜底 500MB。上下界 [100MB, 2GB],结果缓存。
+ */
+export async function getAssetBudget(): Promise<number> {
+  if (budgetCache !== null) return budgetCache;
+  let budget = DEFAULT_ASSET_BUDGET;
+  try {
+    if (typeof navigator !== 'undefined' && navigator.storage?.estimate) {
+      const est = await navigator.storage.estimate();
+      if (est.quota && est.quota > 0) budget = Math.floor(est.quota * 0.3);
+    }
+  } catch {
+    /* 部分隐私模式 estimate 可能抛错,忽略走兜底 */
+  }
+  if (budget === DEFAULT_ASSET_BUDGET) {
+    const dm = (navigator as { deviceMemory?: number }).deviceMemory;
+    if (dm && dm <= 4) budget = 300 * 1024 * 1024;
+    else if (dm) budget = 1 * 1024 * 1024 * 1024;
+  }
+  budget = Math.min(Math.max(budget, 100 * 1024 * 1024), 2 * 1024 * 1024 * 1024);
+  budgetCache = budget;
+  return budget;
+}
+
+/**
+ * 按 lastUsed 升序淘汰最旧资源,直到总占用 ≤ budget(防 20GB 全库撑爆 IndexedDB)。
+ * @returns 被淘汰的 sha256 列表
+ */
+export async function enforceAssetBudget(budget: number): Promise<string[]> {
+  const db = await getDB();
+  const all = (await db.getAll(STORES.assets)) as AssetCacheRecord[];
+  const total = all.reduce((s, r) => s + (r.size || 0), 0);
+  if (total <= budget) return [];
+  const sorted = [...all].sort((a, b) => (a.lastUsed || 0) - (b.lastUsed || 0));
+  const evicted: string[] = [];
+  let cur = total;
+  for (const r of sorted) {
+    if (cur <= budget) break;
+    await db.delete(STORES.assets, r.sha256);
+    cur -= r.size || 0;
+    evicted.push(r.sha256);
+  }
+  return evicted;
+}
+
 // ── 全量导出 / 导入 / 清空 ─────────────────────────────────────────────
 
 /** 把本地全部数据打包为 SyncPayload,用于云同步与备份下载。 */
@@ -172,6 +260,7 @@ export async function clearAll(): Promise<void> {
     clearStore(STORES.worldinfo),
     clearStore(STORES.presets),
     clearStore(STORES.kv),
+    clearStore(STORES.assets),
   ]);
 }
 
