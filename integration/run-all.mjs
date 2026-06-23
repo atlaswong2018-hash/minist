@@ -10,6 +10,7 @@ const DIR = path.dirname(fileURLToPath(import.meta.url));
 
 const scenarios = [
   ['CF 核心路径', 'run-cf-core.mjs'],
+  ['分层存储 S1~S5', 'run-storage.mjs'],
   ['方案二 · Token 自改', 'run-tencent-token.mjs'],
   ['方案一 · CAM(strict 验签)', 'run-tencent-cam.mjs'],
   ['批量管理 · 跨账号 AssumeRole', 'run-batch.mjs'],
