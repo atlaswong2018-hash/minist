@@ -17,9 +17,9 @@
     "@minist/deploy-agent": "*"
   },
   "devDependencies": {
-    "vite": "^5.4.11",
-    "@vitejs/plugin-vue": "^5.2.1",
-    "typescript": "~5.6.3",
+    "vite": "^8.1.0",
+    "@vitejs/plugin-vue": "^6.0.7",
+    "typescript": "~6.0.3",
     "vue-tsc": "^2.1.10"
   }
 }
